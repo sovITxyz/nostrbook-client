@@ -1,6 +1,6 @@
 /**
  * Admin controller — platform moderation and management.
- * All routes require isAdmin flag or role = MOD.
+ * All routes require isAdmin flag or role = MODERATOR.
  */
 
 import { Request, Response } from 'express';
@@ -601,8 +601,7 @@ export async function syncAccounts(req: Request, res: Response): Promise<void> {
             const profileFields = [
                 'name', 'bio', 'avatar', 'banner', 'location', 'skills', 'website',
                 'twitter', 'linkedin', 'github', 'company', 'title', 'tags',
-                'investmentFocus', 'investmentStage', 'minTicket', 'maxTicket',
-                'portfolioCount', 'lookingFor', 'experience', 'biesProjects',
+                'experience', 'communityProjects',
                 'showExperience', 'nostrFeedMode', 'nostrNpub', 'lightningAddress', 'isPublic',
             ];
 

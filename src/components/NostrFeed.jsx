@@ -52,7 +52,7 @@ const NostrFeed = ({ npub, mode = 'combined' }) => {
         t('nostrFeed.combined', 'Combined');
 
     const emptyMessage =
-        mode === 'private'  ? t('nostrFeed.emptyPrivate', 'No private BIES notes found.') :
+        mode === 'private'  ? t('nostrFeed.emptyPrivate', 'No private community notes found.') :
         mode === 'public'   ? t('nostrFeed.emptyPublic', 'No public Nostr activity found.') :
         t('nostrFeed.emptyCombined', 'No recent notes found.');
 

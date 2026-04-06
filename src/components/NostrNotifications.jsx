@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Heart, Repeat, MessageCircle } from 'lucide-react';
-import { nostrService, BIES_RELAY } from '../services/nostrService';
+import { nostrService, COMMUNITY_RELAY } from '../services/nostrService';
 import { nostrSigner } from '../services/nostrSigner';
 import { nip19 } from 'nostr-tools';
 
 /**
- * NostrNotifications — subscribes to the BIES private relay for reactions,
+ * NostrNotifications — subscribes to the community relay for reactions,
  * reposts, and replies targeting the current user's posts.  Renders a bell
  * icon with unread count badge and a dropdown list of clickable notifications.
  */
@@ -68,13 +68,13 @@ const NostrNotifications = ({ mobile = false }) => {
         } catch { /* ignore */ }
     }, []);
 
-    // Step 1: Subscribe to the user's own posts on BIES relay to know which post IDs are "mine"
+    // Step 1: Subscribe to the user's own posts on community relay to know which post IDs are "mine"
     useEffect(() => {
         if (!myPubkey) return;
 
         const postIds = new Set();
         const sub = nostrService.pool.subscribeMany(
-            [BIES_RELAY],
+            [COMMUNITY_RELAY],
             { kinds: [1], authors: [myPubkey], limit: 200 },
             {
                 onevent: (event) => {
@@ -90,7 +90,7 @@ const NostrNotifications = ({ mobile = false }) => {
         return () => { if (sub) sub.close(); };
     }, [myPubkey]);
 
-    // Step 2: Subscribe to reactions, reposts, and replies on the BIES relay
+    // Step 2: Subscribe to reactions, reposts, and replies on the community relay
     useEffect(() => {
         if (!myPubkey || myPostIds.size === 0) return;
 
@@ -99,7 +99,7 @@ const NostrNotifications = ({ mobile = false }) => {
         let debounceTimer = null;
 
         const sub = nostrService.pool.subscribeMany(
-            [BIES_RELAY],
+            [COMMUNITY_RELAY],
             { kinds: [7, 6, 1], '#e': postIdArray, limit: 200 },
             {
                 onevent: (event) => {

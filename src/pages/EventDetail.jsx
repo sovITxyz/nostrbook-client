@@ -35,7 +35,7 @@ Networking opportunities are woven throughout the day, culminating in an evening
     },
     'mock-off-2': {
         id: 'mock-off-2',
-        title: 'BIES Hackathon: Lightning Applications',
+        title: 'Lightning Applications Hackathon',
         category: 'HACKATHON',
         isOfficial: true,
         isOnline: false,
@@ -49,7 +49,7 @@ Networking opportunities are woven throughout the day, culminating in an evening
 
 Prize tracks include: Best Consumer App, Best Developer Tool, Best Business Use Case, and a wildcard Best Bitcoin - Native UX prize.Total prize pool: $15,000 in BTC.
 
-Mentors from the BIES network will be available throughout the event to provide technical guidance on Lightning, Nostr integration, and building for the Salvadoran market.Food, coffee, and a hacker lounge will be provided for the full 48 hours.
+Mentors from the community will be available throughout the event to provide technical guidance on Lightning, Nostr integration, and building for the Salvadoran market. Food, coffee, and a hacker lounge will be provided for the full 48 hours.
 
 To participate, register your team in advance.Solo hackers are welcome — we'll help you find a team at the opening session.`,
         tags: ['Lightning', 'Hackathon', 'Bitcoin', 'Development', 'Prizes'],
@@ -67,12 +67,12 @@ To participate, register your team in advance.Solo hackers are welcome — we'll
         startTime: '2:00 PM – 6:00 PM CST',
         location: 'Virtual & In-Person — San Salvador',
         attendees: 200,
-        description: 'Top BIES-vetted startups pitch live to a curated audience of Bitcoin-native investors.',
-        fullDescription: `The BIES Spring Demo Day showcases the most promising startups from across the BIES portfolio and community. Each company gets 5 minutes to pitch, followed by Q&A from an investor panel.
+        description: 'Top community-vetted startups pitch live to a curated audience of Bitcoin-native investors.',
+        fullDescription: `The Spring Demo Day showcases the most promising startups from across the portfolio and community. Each company gets 5 minutes to pitch, followed by Q&A from an investor panel.
 
 This event is open to investors and ecosystem partners. Attendance is by application only — apply via the link below to be considered. All attendees are verified accredited investors or strategic partners.
 
-The event will be broadcast live online for verified virtual attendees, with full recordings available to BIES members after the event. In-person attendance includes a cocktail reception and 1:1 meeting matchmaking with founders.
+The event will be broadcast live online for verified virtual attendees, with full recordings available to community members after the event. In-person attendance includes a cocktail reception and 1:1 meeting matchmaking with founders.
 
 If you're a startup interested in presenting, applications close April 15th.`,
         tags: ['Demo Day', 'Fundraising', 'Startups', 'Investors', 'Pitching'],
@@ -85,7 +85,7 @@ If you're a startup interested in presenting, applications close April 15th.`,
         category: 'MEETUP',
         isOfficial: false,
         isOnline: false,
-        organizer: 'BIES Community',
+        organizer: 'Community',
         startDate: '2026-03-18T18:30:00Z',
         startTime: '6:30 PM – 9:00 PM CST',
         location: 'La Ventana Café, San Salvador',
@@ -108,7 +108,7 @@ RSVPs are helpful but not required. The venue can accommodate up to ~50 people, 
         category: 'WORKSHOP',
         isOfficial: false,
         isOnline: true,
-        organizer: 'BIES Community',
+        organizer: 'Community',
         startDate: '2026-03-25T10:00:00Z',
         startTime: '10:00 AM – 12:00 PM CST',
         location: 'Online — Zoom',
@@ -131,7 +131,7 @@ Register via Zoom link to receive calendar invite and code repository access.`,
         category: 'NETWORKING',
         isOfficial: false,
         isOnline: false,
-        organizer: 'BIES Community',
+        organizer: 'Community',
         startDate: '2026-04-08T19:00:00Z',
         startTime: '7:00 PM – 10:00 PM CST',
         location: 'Rooftop Bar La Terraza, Santa Tecla',
@@ -154,7 +154,7 @@ Space is limited to 60 people. RSVP early to secure your spot.`,
         category: 'WORKSHOP',
         isOfficial: false,
         isOnline: true,
-        organizer: 'BIES Community',
+        organizer: 'Community',
         startDate: '2026-04-22T17:00:00Z',
         startTime: '5:00 PM – 7:00 PM CST',
         location: 'Online — Google Meet',
@@ -322,10 +322,10 @@ const EventDetail = () => {
                                     {t('eventDetail.hostedBy', 'Hosted by')}{' '}
                                     {event.host?.id ? (
                                         <Link to={`/builder/${event.host.id}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                                            {event.organizer || event.host?.profile?.name || event.host?.profile?.company || 'BIES Community'}
+                                            {event.organizer || event.host?.profile?.name || event.host?.profile?.company || 'Community'}
                                         </Link>
                                     ) : (
-                                        <span style={{ fontWeight: 600 }}>{event.organizer || 'BIES Community'}</span>
+                                        <span style={{ fontWeight: 600 }}>{event.organizer || 'Community'}</span>
                                     )}
                                 </p>
                                 {event.host?.nostrPubkey && (

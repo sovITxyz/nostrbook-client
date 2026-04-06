@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
+import { config } from '../config';
 
 /**
  * GET /.well-known/nostr.json?name=<username>
@@ -37,7 +38,7 @@ export async function nostrJson(req: Request, res: Response): Promise<void> {
 
         res.json({
             names: { [normalizedName]: pubkey },
-            relays: { [pubkey]: ['wss://bies.sovit.xyz/relay'] },
+            relays: { [pubkey]: config.nostrPublicRelay ? [config.nostrPublicRelay] : [] },
         });
     } catch (error) {
         console.error('NIP-05 lookup error:', error);

@@ -1,5 +1,5 @@
 /**
- * authService — bridges the frontend auth flow with the BIES backend.
+ * authService — bridges the frontend auth flow with the nostrbook backend.
  *
  * JWT is stored in localStorage under 'bies_token'.
  * User object (without secrets) is cached under 'bies_user'.

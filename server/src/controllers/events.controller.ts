@@ -44,7 +44,7 @@ export const createEventSchema = z.object({
         yAxisLabel: z.string().optional(),
         dataPoints: z.array(z.object({ label: z.string(), value: z.union([z.string(), z.number()]) })).optional(),
     })).optional(),
-    nostrPublish: z.enum(['none', 'bies', 'public', 'both']).default('bies'),
+    nostrPublish: z.enum(['none', 'community', 'public', 'both']).default('community'),
 });
 
 export const updateEventSchema = createEventSchema.partial();
@@ -359,11 +359,11 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
 
         await cache.delPattern('events:');
 
-        // Announce new event on the BIES feed
+        // Announce new event on the community feed
         if (isPublished) {
-            const hostName = event.host?.profile?.name || 'A BIES member';
+            const hostName = event.host?.profile?.name || 'A community member';
             const dateStr = data.startDate ? new Date(data.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-            publishAnnouncement(req.user!.id, `${hostName} is hosting "${event.title}"${dateStr ? ` on ${dateStr}` : ''}${event.location ? ` in ${event.location}` : ''}. Check it out on BIES!`, [['t', 'new-event']]).catch((err) =>
+            publishAnnouncement(req.user!.id, `${hostName} is hosting "${event.title}"${dateStr ? ` on ${dateStr}` : ''}${event.location ? ` in ${event.location}` : ''}. Check it out!`, [['t', 'new-event']]).catch((err) =>
                 console.error('[Nostr] Event announcement failed:', err)
             );
         }
@@ -395,7 +395,7 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
                         tags: parsedTags,
                         thumbnail: event.thumbnail || undefined,
                         ticketUrl: event.ticketUrl || undefined,
-                    }, nostrPublish as 'bies' | 'public' | 'both');
+                    }, nostrPublish as 'community' | 'public' | 'both');
                     if (nostrEventId) {
                         await prisma.event.update({
                             where: { id: event.id },
@@ -484,7 +484,7 @@ export async function updateEvent(req: Request, res: Response): Promise<void> {
         const isNowPublic = event.isPublished;
 
         if (wasPublic && !isNowPublic && existing.nostrEventId) {
-            const prevTarget = (existing.nostrPublish || 'bies') as 'bies' | 'public' | 'both';
+            const prevTarget = (existing.nostrPublish || 'community') as 'community' | 'public' | 'both';
             deleteCalendarEvent(req.user!.id, existing.nostrEventId, event.id, prevTarget).catch((err) =>
                 console.error('[Nostr] NIP-09 deletion on visibility change failed:', err)
             );
@@ -518,7 +518,7 @@ export async function updateEvent(req: Request, res: Response): Promise<void> {
                         tags: parsedTags.length > 0 ? parsedTags : JSON.parse(event.tags || '[]'),
                         thumbnail: event.thumbnail || undefined,
                         ticketUrl: event.ticketUrl || undefined,
-                    }, nostrPublish as 'bies' | 'public' | 'both');
+                    }, nostrPublish as 'community' | 'public' | 'both');
                     if (nostrEventId) {
                         await prisma.event.update({
                             where: { id: event.id },
@@ -567,7 +567,7 @@ export async function deleteEvent(req: Request, res: Response): Promise<void> {
                 existing.hostId,
                 existing.nostrEventId,
                 req.params.id,
-                (existing.nostrPublish || 'bies') as 'bies' | 'public' | 'both'
+                (existing.nostrPublish || 'community') as 'community' | 'public' | 'both'
             ).catch((err) =>
                 console.error('[Nostr] NIP-09 deletion on event delete failed:', err)
             );
@@ -656,13 +656,13 @@ export async function rsvpEvent(req: Request, res: Response): Promise<void> {
             create: { eventId: req.params.id, userId, status },
         });
 
-        // Announce RSVP on the BIES feed (only for new RSVPs with GOING status)
+        // Announce RSVP on the community feed (only for new RSVPs with GOING status)
         if (!existingRsvp && (status === 'GOING' || status === 'INTERESTED')) {
             const rsvpUser = await prisma.user.findUnique({
                 where: { id: userId },
                 select: { profile: { select: { name: true } } },
             });
-            const userName = rsvpUser?.profile?.name || 'A BIES member';
+            const userName = rsvpUser?.profile?.name || 'A community member';
 
             if (status === 'GOING') {
                 publishAnnouncement(userId, `${userName} is going to "${event.title}"!`, [['t', 'rsvp']]).catch((err) =>
@@ -696,7 +696,7 @@ export async function rsvpEvent(req: Request, res: Response): Promise<void> {
                 eventDTag: req.params.id,
                 hostPubkey: event.host.nostrPubkey,
                 status: rsvpStatusMap[status] || 'tentative',
-            }, nostrTarget as 'bies' | 'public' | 'both').then(async (nostrRsvpId) => {
+            }, nostrTarget as 'community' | 'public' | 'both').then(async (nostrRsvpId) => {
                 if (nostrRsvpId) {
                     await prisma.eventAttendee.update({
                         where: { id: attendee.id },

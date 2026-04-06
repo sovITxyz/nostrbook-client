@@ -226,7 +226,6 @@ export async function getProject(req: Request, res: Response): Promise<void> {
  */
 export async function createProject(req: Request, res: Response): Promise<void> {
     try {
-        require('fs').appendFileSync('/tmp/bies_debug.log', "--- CREATE PROJECT ---\n" + JSON.stringify(req.body, null, 2) + "\n");
         console.log("--- CREATE PROJECT ---");
 
         // Explicitly pick allowed fields — never allow isPublished, status, isFeatured, etc.
@@ -280,9 +279,9 @@ export async function createProject(req: Request, res: Response): Promise<void> 
             }
         }).catch((err) => console.error('[Nostr] Project listing sync failed:', err));
 
-        // Announce new project on the BIES feed
+        // Announce new project on the community feed
         const ownerName = project.owner?.profile?.name || 'A builder';
-        publishAnnouncement(req.user!.id, `${ownerName} just created a new project: "${project.title}" in ${project.category}. Check it out on BIES!`, [['t', 'new-project']]).catch((err) =>
+        publishAnnouncement(req.user!.id, `${ownerName} just created a new project: "${project.title}" in ${project.category}. Check it out!`, [['t', 'new-project']]).catch((err) =>
             console.error('[Nostr] Project announcement failed:', err)
         );
 
@@ -309,7 +308,6 @@ export async function updateProject(req: Request, res: Response): Promise<void> 
             res.status(403).json({ error: 'Not authorized to update this project' }); return;
         }
 
-        require('fs').appendFileSync('/tmp/bies_debug.log', "--- UPDATE PROJECT ---\n" + JSON.stringify(req.body, null, 2) + "\n");
         console.log("--- UPDATE PROJECT ---");
 
         // Explicitly pick allowed fields — never allow isPublished, status, isFeatured, ownerId, etc.

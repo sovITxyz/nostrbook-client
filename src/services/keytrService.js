@@ -163,7 +163,7 @@ export const keytrService = {
             rpId,
             rpName: rpId.split('.')[0],
             userName: pubkey.slice(0, 16),
-            userDisplayName: 'BIES Account',
+            userDisplayName: 'Nostrbook Account',
         };
 
         let credential, encryptedBlob, mode;
@@ -207,7 +207,7 @@ export const keytrService = {
         const eventTemplate = buildKeytrEvent({
             credential,
             encryptedBlob,
-            clientName: 'bies',
+            clientName: 'nostrbook',
             ...(mode === 'kih' && { version: String(KEYTR_KIH_VERSION) }),
         });
 
@@ -231,7 +231,7 @@ export const keytrService = {
      * Tier 1: stored credentials — fetch events by pubkey, try PRF events
      * with loginWithKeytr (targeted assertion, one prompt).
      *
-     * Tier 2: cached BIES user — same as Tier 1 using cached pubkey.
+     * Tier 2: cached user — same as Tier 1 using cached pubkey.
      *
      * Tier 3: discoverable — browser shows available passkeys, auto-detects
      * PRF vs KiH mode.
@@ -263,7 +263,7 @@ export const keytrService = {
             }
         }
 
-        // Tier 2 — cached BIES user pubkey
+        // Tier 2 — cached user pubkey
         const raw = localStorage.getItem('bies_user');
         const cached = raw ? JSON.parse(raw) : null;
         if (cached?.nostrPubkey) {

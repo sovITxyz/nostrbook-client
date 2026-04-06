@@ -1,0 +1,8 @@
+{
+  "name": "nostrbook-relay",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "nostr-swarm": "^0.1.2"
+  }
+}

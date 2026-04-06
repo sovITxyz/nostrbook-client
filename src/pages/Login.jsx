@@ -157,7 +157,7 @@ const Login = () => {
     const handleDemoLogin = () => {
         const demoUser = {
             id: 'demo-user',
-            email: 'demo@bies.dev',
+            email: 'demo@nostrbook.dev',
             nostrPubkey: '0000000000000000000000000000000000000000000000000000000000000000',
             role: 'BUILDER',
             profile: { name: 'Demo User', bio: 'Demo account for mobile testing', avatar: '', banner: '' },
@@ -172,7 +172,7 @@ const Login = () => {
         <div className="login-container">
             <div className="login-card">
                 <div className="logo mb-6">
-                    <img src={logoIcon} alt="BIES" style={{ height: '64px', width: 'auto' }} />
+                    <img src={logoIcon} alt="Nostrbook" style={{ height: '64px', width: 'auto' }} />
                 </div>
 
                 <h2 className="login-heading" style={{ fontSize: '1.5rem' }}>{t('login.welcomeBack')}</h2>

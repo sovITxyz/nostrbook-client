@@ -54,7 +54,7 @@ const ZapModal = ({ recipients = [], eventId, onClose }) => {
     const amount = customAmount ? parseInt(customAmount, 10) : selectedAmount;
 
     // Resolve lud16 for all recipients on mount.
-    // Priority: 1) lud16 passed from parent, 2) Nostr profile, 3) BIES API profile
+    // Priority: 1) lud16 passed from parent, 2) Nostr profile, 3) platform API profile
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -77,7 +77,7 @@ const ZapModal = ({ recipients = [], eventId, onClose }) => {
                     }
                 } catch { /* skip */ }
 
-                // 3. Fallback: check BIES API profile (lightningAddress)
+                // 3. Fallback: check platform API profile (lightningAddress)
                 try {
                     const biesProfile = await profilesApi.get(r.pubkey);
                     if (biesProfile?.lightningAddress) {

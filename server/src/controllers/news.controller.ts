@@ -52,20 +52,20 @@ export async function getNewsStories(req: Request, res: Response): Promise<void>
 }
 
 /**
- * GET /news/bies-updates
- * Platform announcements — articles with category = BIES_UPDATE.
+ * GET /news/platform-updates
+ * Platform announcements — articles with category = PLATFORM_UPDATE.
  */
-export async function getBiesUpdates(req: Request, res: Response): Promise<void> {
+export async function getPlatformUpdates(req: Request, res: Response): Promise<void> {
     try {
         const { page = '1', limit = '10' } = req.query;
         const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
         const take = Math.min(parseInt(limit as string, 10), 50);
 
-        const cKey = `news:bies_updates:${page}:${limit}`;
+        const cKey = `news:platform_updates:${page}:${limit}`;
         const cached = await cache.getJson<any>(cKey);
         if (cached) { res.setHeader('X-Cache', 'HIT'); res.json(cached); return; }
 
-        const where = { isPublished: true, category: 'BIES_UPDATE' };
+        const where = { isPublished: true, category: 'PLATFORM_UPDATE' };
 
         const [articles, total] = await Promise.all([
             prisma.article.findMany({
@@ -85,7 +85,7 @@ export async function getBiesUpdates(req: Request, res: Response): Promise<void>
         await cache.setJson(cKey, result, TTL.CONTENT_LIST);
         res.json(result);
     } catch (error) {
-        console.error('BIES updates error:', error);
-        res.status(500).json({ error: 'Failed to get BIES updates' });
+        console.error('Platform updates error:', error);
+        res.status(500).json({ error: 'Failed to get platform updates' });
     }
 }

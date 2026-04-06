@@ -1,4 +1,4 @@
-// BIES Platform – Prisma Schema
+// Nostrbook Platform – Prisma Schema
 // Production DB: PostgreSQL (change provider to "postgresql" for prod)
 // Dev DB: SQLite (provider = "sqlite")
 
@@ -21,7 +21,7 @@ model User {
   passwordHash     String?  @map("password_hash")
   nostrPubkey      String   @unique @map("nostr_pubkey")
   encryptedPrivkey String?  @map("encrypted_privkey")
-  role             String   @default("MEMBER") // BUILDER | INVESTOR | MOD | MEMBER | EDUCATOR | EVENT_HOST
+  role             String   @default("MEMBER") // MEMBER | MODERATOR | ADMIN | EVENT_HOST | EDUCATOR
   isAdmin          Boolean  @default(false) @map("is_admin")
   isVerified       Boolean  @default(false) @map("is_verified")
   isBanned         Boolean  @default(false) @map("is_banned")
@@ -34,8 +34,7 @@ model User {
   sessions         Session[]
   sentMessages     Message[]         @relation("SentMessages")
   receivedMessages Message[]         @relation("ReceivedMessages")
-  watchlist        WatchlistItem[]
-  investments      Investment[]
+  bookmarks        Bookmark[]
   notifications    Notification[]
   pushSubscriptions PushSubscription[]
   following        Follow[]          @relation("Following")
@@ -44,8 +43,6 @@ model User {
   auditLogs        AuditLog[]
   projectViews     ProjectView[]
   teamMemberships  ProjectTeamMember[]
-  deckRequests     DeckRequest[]
-  investorRequests InvestorRequest[]
   eventRSVPs      EventAttendee[]
   settings         UserSettings?
   fingerprints     BrowserFingerprint[]
@@ -87,17 +84,9 @@ model Profile {
   company      String   @default("")
   title        String   @default("")
   tags         String   @default("[]")  // JSON array
-  // Investor-specific
-  investmentFocus String @default("[]") @map("investment_focus") // JSON array of sectors
-  investmentStage String @default("[]") @map("investment_stage") // JSON array of stages
-  minTicket    Float?   @map("min_ticket")
-  maxTicket    Float?   @map("max_ticket")
-  portfolioCount Int    @default(0) @map("portfolio_count")
-  // Builder-specific
-  lookingFor   String   @default("[]") @map("looking_for") // JSON array (funding, cofounder, etc.)
   // Profile sections
   experience     String   @default("[]")  // JSON array of {title,company,date,description}
-  biesProjects   String   @default("[]") @map("bies_projects")  // JSON array of {id,name,role,status,image}
+  communityProjects String @default("[]") @map("community_projects") // JSON array of {id,name,role,status,image}
   customSections String   @default("[]") @map("custom_sections") // JSON array of {title,type,placement,body,...}
   showExperience Boolean  @default(true) @map("show_experience")
   nostrFeedMode  String   @default("combined") @map("nostr_feed_mode")
@@ -128,38 +117,29 @@ model Project {
   title        String
   description  String
   category     String   @default("OTHER")
-  // ENERGY | FINTECH | EDUCATION | AGRICULTURE | REAL_ESTATE | INFRASTRUCTURE | TOURISM | TECHNOLOGY | OTHER
+  // TECHNOLOGY | EDUCATION | COMMUNITY | CREATIVE | INFRASTRUCTURE | OTHER
   stage        String   @default("IDEA")
   // IDEA | MVP | GROWTH | SCALING
-  fundingGoal  Float?   @map("funding_goal")
-  raisedAmount Float    @default(0) @map("raised_amount")
   thumbnail    String   @default("")
-  deckKey      String?  @map("deck_key")
-  requiresDeckApproval Boolean  @default(true) @map("requires_deck_approval")
   demoUrl      String   @default("") @map("demo_url")
   websiteUrl   String   @default("") @map("website_url")
   tags         String   @default("[]") // JSON array
   customSections String  @default("[]") @map("custom_sections") // JSON array of { title, body }
   teamInfo     String   @default("[]") @map("team_info") // JSON array of { name, position, avatar }
-  useOfFunds   String   @default("[]") @map("use_of_funds") // JSON array of { label, percentage }
-  ownerRole    String?  @map("owner_role")
   status       String   @default("draft") // draft | pending-review | active
   isPublished  Boolean  @default(true) @map("is_published")
   isFeatured   Boolean  @default(false) @map("is_featured")
   viewCount    Int      @default(0) @map("view_count")
-  nostrEventId        String?  @map("nostr_event_id")
-  nostrListingEventId String?  @map("nostr_listing_event_id")
+  nostrEventId String?  @map("nostr_event_id")
   ownerId      String   @map("owner_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   owner        User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  watchlisted  WatchlistItem[]
-  investments  Investment[]
+  bookmarks    Bookmark[]
   teamMembers  ProjectTeamMember[]
   views        ProjectView[]
   updates      ProjectUpdate[]
-  deckRequests DeckRequest[]
   zapReceipts  ZapReceipt[]
 
   @@map("projects")
@@ -206,34 +186,10 @@ model ProjectView {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Investments / Funding
+// Bookmarks (saved projects)
 // ─────────────────────────────────────────────────────────────────────────────
 
-model Investment {
-  id         String   @id @default(cuid())
-  projectId  String   @map("project_id")
-  investorId String   @map("investor_id")
-  amount     Float
-  currency   String   @default("USD") // USD | BTC | SATS
-  status     String   @default("PENDING")
-  // PENDING | COMMITTED | COMPLETED | WITHDRAWN
-  terms      String   @default("") // free-form deal terms
-  notes      String   @default("")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  investor User    @relation(fields: [investorId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, investorId])
-  @@map("investments")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Watchlist (Investor saved projects)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model WatchlistItem {
+model Bookmark {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   projectId String   @map("project_id")
@@ -244,7 +200,7 @@ model WatchlistItem {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
-  @@map("watchlist_items")
+  @@map("bookmarks")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,7 +234,7 @@ model Notification {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   type      String
-  // NEW_MESSAGE | PROJECT_VIEW | INVESTMENT_INTEREST | WATCHLIST_ADD
+  // NEW_MESSAGE | PROJECT_VIEW | BOOKMARK_ADD
   // FOLLOW | PROJECT_UPDATE | SYSTEM
   title     String
   body      String
@@ -346,7 +302,7 @@ model Event {
   locationMapUrl  String   @default("") @map("location_map_url")
   customSections  String   @default("[]") @map("custom_sections") // JSON array of {title, content}
   nostrEventId    String   @default("") @map("nostr_event_id") // NIP-52 calendar event id
-  nostrPublish    String   @default("none") @map("nostr_publish") // none | bies | public | both
+  nostrPublish    String   @default("none") @map("nostr_publish") // none | community | public | both
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -409,25 +365,6 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Deck Access Requests
-// ─────────────────────────────────────────────────────────────────────────────
-
-model DeckRequest {
-  id         String    @id @default(cuid())
-  projectId  String    @map("project_id")
-  investorId String    @map("investor_id")
-  status     String    @default("PENDING") // PENDING | APPROVED | DENIED
-  message    String    @default("") // investor can include a note
-  reviewedAt DateTime? @map("reviewed_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  investor User    @relation(fields: [investorId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, investorId])
-  @@map("deck_requests")
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contact Submissions
@@ -437,7 +374,7 @@ model ContactSubmission {
   id        String   @id @default(cuid())
   name      String
   email     String
-  role      String   @default("") // BUILDER | INVESTOR | MEDIA | OTHER
+  role      String   @default("") // MEMBER | ORGANIZER | MEDIA | OTHER
   message   String
   ipAddress String?  @map("ip_address")
   createdAt DateTime @default(now()) @map("created_at")
@@ -456,7 +393,7 @@ model UserSettings {
   pushNotifications    Boolean @default(true) @map("push_notifications")
   marketingEmails      Boolean @default(false) @map("marketing_emails")
   notifyMessages       Boolean @default(true) @map("notify_messages")
-  notifyInvestments    Boolean @default(true) @map("notify_investments")
+  notifyBookmarks      Boolean @default(true) @map("notify_bookmarks")
   notifyFollows        Boolean @default(true) @map("notify_follows")
   notifyProjectUpdates Boolean @default(true) @map("notify_project_updates")
   relays               String  @default("[]") // JSON array of relay URLs
@@ -495,7 +432,7 @@ model Article {
   slug        String   @unique
   excerpt     String   @default("")
   content     String   // Full markdown/HTML content
-  category    String   @default("NEWS") // NEWS | TUTORIAL | BIES_UPDATE | LEGAL | GUIDE
+  category    String   @default("NEWS") // NEWS | TUTORIAL | PLATFORM_UPDATE | LEGAL | GUIDE
   thumbnail   String   @default("")
   authorName  String   @default("") @map("author_name")
   isPublished Boolean  @default(false) @map("is_published")
@@ -586,20 +523,3 @@ model BrowserFingerprint {
   @@map("browser_fingerprints")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Investor Role Requests
-// ─────────────────────────────────────────────────────────────────────────────
-
-model InvestorRequest {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  status    String   @default("PENDING") // PENDING | APPROVED | DENIED
-  message   String   @default("") // optional pitch or linkedin link
-  reviewedAt DateTime? @map("reviewed_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("investor_requests")
-}

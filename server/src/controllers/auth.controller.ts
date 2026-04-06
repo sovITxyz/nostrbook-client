@@ -9,66 +9,14 @@ import { encryptPrivateKey, decryptPrivateKey } from '../services/crypto.service
 import { publishRelayList } from '../services/nostr.service';
 import { cache } from '../services/redis.service';
 import { config } from '../config';
+import { addCommunityMember, removeCommunityMember } from '../services/membership.service';
 import { z } from 'zod';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-
-// ─── Relay whitelist helper ───
 
 const HEX_PUBKEY_RE = /^[0-9a-f]{64}$/;
 
-const WHITELIST_PATH = process.env.RELAY_WHITELIST_PATH || '/app/relay-whitelist/whitelist.txt';
-
-/**
- * Add a pubkey to the Nostr relay whitelist file.
- * The strfry write-policy plugin reads this file to authorize publishers.
- */
-export function addToRelayWhitelist(pubkey: string): void {
-    try {
-        // Validate pubkey format to prevent injection into whitelist file
-        if (!HEX_PUBKEY_RE.test(pubkey)) {
-            console.error('[Relay] Invalid pubkey format, refusing to whitelist');
-            return;
-        }
-
-        const dir = path.dirname(WHITELIST_PATH);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-
-        // Read existing whitelist
-        let existing = '';
-        if (fs.existsSync(WHITELIST_PATH)) {
-            existing = fs.readFileSync(WHITELIST_PATH, 'utf8');
-        }
-
-        // Only add if not already present
-        if (!existing.split('\n').includes(pubkey)) {
-            fs.appendFileSync(WHITELIST_PATH, pubkey + '\n');
-            console.log(`[Relay] Added ${pubkey.substring(0, 8)}... to whitelist`);
-        }
-    } catch (err) {
-        console.error('[Relay] Failed to update whitelist:', err);
-    }
-}
-
-/**
- * Remove a pubkey from the Nostr relay whitelist file.
- * Called when a user is banned to revoke relay access.
- */
-export function removeFromRelayWhitelist(pubkey: string): void {
-    try {
-        if (!fs.existsSync(WHITELIST_PATH)) return;
-
-        const existing = fs.readFileSync(WHITELIST_PATH, 'utf8');
-        const lines = existing.split('\n').filter((line) => line !== pubkey && line.trim() !== '');
-        fs.writeFileSync(WHITELIST_PATH, lines.join('\n') + (lines.length ? '\n' : ''));
-        console.log(`[Relay] Removed ${pubkey.substring(0, 8)}... from whitelist`);
-    } catch (err) {
-        console.error('[Relay] Failed to remove from whitelist:', err);
-    }
-}
+// Re-export membership functions under the old names for admin controller compatibility
+export { addCommunityMember as addToRelayWhitelist, removeCommunityMember as removeFromRelayWhitelist };
 
 // ─── Fingerprint helpers (ban evasion detection) ───
 
@@ -241,7 +189,7 @@ export async function register(req: Request, res: Response): Promise<void> {
         }
 
         // Add custodial pubkey to relay whitelist so email users can access the private relay
-        addToRelayWhitelist(nostrPubkey);
+        addCommunityMember(nostrPubkey);
 
         // Publish NIP-65 relay list for the new custodial user
         publishRelayList(user.id).catch((err) =>
@@ -518,8 +466,8 @@ export async function nostrLogin(req: Request, res: Response): Promise<void> {
 
         const token = generateToken(user.id, user.role, user.isAdmin);
 
-        // Add pubkey to relay whitelist so user can publish to the BIES relay
-        addToRelayWhitelist(pubkey);
+        // Add pubkey to relay whitelist so user can publish to the community relay
+        addCommunityMember(pubkey);
 
         res.json({
             user: {
@@ -625,7 +573,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 export async function demoLogin(req: Request, res: Response): Promise<void> {
     try {
         const user = await prisma.user.findFirst({
-            where: { email: 'demo@bies.dev' },
+            where: { email: 'demo@nostrbook.dev' },
             include: { profile: true },
         });
 

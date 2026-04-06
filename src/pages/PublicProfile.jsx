@@ -121,7 +121,7 @@ const PublicProfile = ({ type }) => {
         }
     }, [profile]);
 
-    // Fetch BIES followers/following counts
+    // Fetch followers/following counts
     useEffect(() => {
         const userId = profile?.user?.id || profile?.userId;
         if (!userId) return;
@@ -393,7 +393,7 @@ const PublicProfile = ({ type }) => {
 
                             {/* Follower Stats */}
                             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-                                {/* BIES stats */}
+                                {/* Platform stats */}
                                 <div style={{ display: 'flex', gap: '1.5rem' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                         <Users size={16} style={{ color: 'var(--color-primary)' }} />

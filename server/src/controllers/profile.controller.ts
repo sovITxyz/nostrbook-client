@@ -3,6 +3,7 @@ import prisma from '../lib/prisma';
 import { cache, cacheKey, TTL } from '../services/redis.service';
 import { notifyProfileView } from '../services/notification.service';
 import { publishProfileUpdate, publishAnnouncement } from '../services/nostr.service';
+import { config } from '../config';
 import { z } from 'zod';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -28,7 +29,7 @@ export const updateProfileSchema = z.object({
         date: z.string().optional(),
         description: z.string().optional(),
     })).optional(),
-    biesProjects: z.array(z.object({
+    communityProjects: z.array(z.object({
         id: z.string(),
         name: z.string(),
         role: z.string().optional(),
@@ -54,13 +55,6 @@ export const updateProfileSchema = z.object({
     // NIP-05 & Lightning
     nip05Name: z.string().min(3).max(30).regex(/^[a-z0-9._-]+$/, 'Only lowercase letters, numbers, dots, hyphens, underscores').optional(),
     lightningAddress: z.string().optional(),
-    // Investor-specific
-    investmentFocus: z.array(z.string()).optional(),
-    investmentStage: z.array(z.string()).optional(),
-    minTicket: z.number().positive().optional(),
-    maxTicket: z.number().positive().optional(),
-    // Builder-specific
-    lookingFor: z.array(z.string()).optional(),
     isPublic: z.boolean().optional(),
 });
 
@@ -137,11 +131,8 @@ export async function listProfiles(req: Request, res: Response): Promise<void> {
             ...p,
             skills: JSON.parse(p.skills || '[]'),
             tags: JSON.parse(p.tags || '[]'),
-            investmentFocus: JSON.parse(p.investmentFocus || '[]'),
-            investmentStage: JSON.parse(p.investmentStage || '[]'),
-            lookingFor: JSON.parse(p.lookingFor || '[]'),
             experience: JSON.parse(p.experience || '[]'),
-            biesProjects: JSON.parse(p.biesProjects || '[]'),
+            communityProjects: JSON.parse(p.communityProjects || '[]'),
             customSections: JSON.parse(p.customSections || '[]'),
         }));
 
@@ -248,11 +239,8 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
             ...profile,
             skills: JSON.parse(profile.skills || '[]'),
             tags: JSON.parse(profile.tags || '[]'),
-            investmentFocus: JSON.parse(profile.investmentFocus || '[]'),
-            investmentStage: JSON.parse(profile.investmentStage || '[]'),
-            lookingFor: JSON.parse(profile.lookingFor || '[]'),
             experience: JSON.parse(profile.experience || '[]'),
-            biesProjects: JSON.parse(profile.biesProjects || '[]'),
+            communityProjects: JSON.parse(profile.communityProjects || '[]'),
             customSections: JSON.parse(profile.customSections || '[]'),
         };
 
@@ -274,8 +262,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
         const allowedFields = [
             'name', 'bio', 'avatar', 'banner', 'location', 'skills', 'website',
             'twitter', 'linkedin', 'github', 'company', 'title', 'tags',
-            'investmentFocus', 'investmentStage', 'minTicket', 'maxTicket',
-            'lookingFor', 'isPublic', 'nostrNpub', 'experience', 'biesProjects',
+            'isPublic', 'nostrNpub', 'experience', 'communityProjects',
             'customSections', 'showExperience', 'nostrFeedMode', 'nip05Name', 'lightningAddress',
         ];
         const data: any = {};
@@ -303,7 +290,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
         const oldProfile = await prisma.profile.findUnique({ where: { userId: req.user!.id }, select: { lightningAddress: true } });
 
         // Convert arrays/objects to JSON strings for SQLite
-        const arrayFields = ['skills', 'tags', 'investmentFocus', 'investmentStage', 'lookingFor', 'experience', 'biesProjects', 'customSections'];
+        const arrayFields = ['skills', 'tags', 'experience', 'communityProjects', 'customSections'];
         for (const field of arrayFields) {
             if (data[field] !== undefined) data[field] = JSON.stringify(data[field]);
         }
@@ -321,7 +308,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
             cache.delPattern('profiles:'),
         ]);
 
-        const arrayParsedFields = ['skills', 'tags', 'investmentFocus', 'investmentStage', 'lookingFor', 'experience', 'biesProjects', 'customSections'];
+        const arrayParsedFields = ['skills', 'tags', 'experience', 'communityProjects', 'customSections'];
         const parsed: any = { ...profile };
         for (const f of arrayParsedFields) {
             parsed[f] = JSON.parse((profile as any)[f] || '[]');
@@ -329,7 +316,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
 
         // Sync to Nostr Kind 0 if identity-related fields changed
         if (req.body.nip05Name !== undefined || req.body.lightningAddress !== undefined || req.body.name !== undefined) {
-            const nip05 = profile.nip05Name ? `${profile.nip05Name}@bies.sovit.xyz` : '';
+            const nip05 = profile.nip05Name && config.nip05Domain ? `${profile.nip05Name}@${config.nip05Domain}` : '';
             publishProfileUpdate(req.user!.id, {
                 name: profile.name || '',
                 about: profile.bio || '',
@@ -341,9 +328,9 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
             }).catch((err) => console.error('[Nostr] Profile sync failed:', err));
         }
 
-        // Announce lightning address addition on the BIES feed
+        // Announce lightning address addition on the community feed
         if (req.body.lightningAddress && req.body.lightningAddress !== oldProfile?.lightningAddress) {
-            publishAnnouncement(req.user!.id, `${profile.name || 'A BIES member'} just added a Lightning address! They're ready to receive sats.`, [['t', 'lightning']]).catch((err) =>
+            publishAnnouncement(req.user!.id, `${profile.name || 'A community member'} just added a Lightning address! They're ready to receive sats.`, [['t', 'lightning']]).catch((err) =>
                 console.error('[Nostr] Lightning announcement failed:', err)
             );
         }
@@ -427,7 +414,7 @@ export async function getMyProfile(req: Request, res: Response): Promise<void> {
             return;
         }
 
-        const arrayFields = ['skills', 'tags', 'investmentFocus', 'investmentStage', 'lookingFor', 'experience', 'biesProjects', 'customSections'];
+        const arrayFields = ['skills', 'tags', 'experience', 'communityProjects', 'customSections'];
         const parsed: any = { ...profile };
         for (const f of arrayFields) {
             parsed[f] = JSON.parse((profile as any)[f] || '[]');

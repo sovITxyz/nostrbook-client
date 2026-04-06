@@ -1,5 +1,5 @@
 {
-    "name": "bies-server",
+    "name": "nostrbook-server",
     "version": "0.3.0",
     "private": true,
     "scripts": {

@@ -144,7 +144,7 @@ export async function notifyFollow(params: {
         userId: params.followedId,
         type: 'FOLLOW',
         title: `${params.followerName} started following you`,
-        body: 'You have a new follower on BIES.',
+        body: 'You have a new follower.',
         data: { followerId: params.followerId },
     });
 }
@@ -227,7 +227,7 @@ export async function notifyProfileView(params: {
         userId: params.profileOwnerId,
         type: 'PROFILE_VIEW',
         title: `${params.viewerName} viewed your profile`,
-        body: 'Someone checked out your BIES profile.',
+        body: 'Someone checked out your profile.',
         data: { viewerId: params.viewerId },
     });
 }
@@ -292,8 +292,8 @@ export async function notifyZapReceived(params: {
 
 /**
  * Create a notification for a feed interaction (comment, like, reply, zap).
- * Looks up the target Nostr pubkey to find the BIES user. Silently skips if
- * the target is not a BIES user or if actor === target.
+ * Looks up the target Nostr pubkey to find the platform user. Silently skips if
+ * the target is not a registered user or if actor === target.
  */
 export async function notifyFeedInteraction(params: {
     actorPubkey: string;
@@ -311,7 +311,7 @@ export async function notifyFeedInteraction(params: {
         where: { nostrPubkey: params.targetPubkey },
         select: { id: true },
     });
-    if (!targetUser) return; // Not a BIES user
+    if (!targetUser) return; // Not a registered user
 
     const typeConfig: Record<string, { title: string; body: string }> = {
         POST_COMMENT: {

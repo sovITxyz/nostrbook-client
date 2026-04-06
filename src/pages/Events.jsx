@@ -23,7 +23,7 @@ const MOCK_OFFICIAL_EVENTS = [
     },
     {
         id: 'mock-off-2',
-        title: 'BIES Hackathon: Lightning Applications',
+        title: 'Lightning Applications Hackathon',
         description: 'A 48-hour hackathon focused on building Lightning Network-powered applications. Cash prizes and mentorship from top Bitcoin developers in the ecosystem.',
         category: 'HACKATHON',
         startDate: '2026-05-03T10:00:00Z',
@@ -36,7 +36,7 @@ const MOCK_OFFICIAL_EVENTS = [
     {
         id: 'mock-off-3',
         title: 'Investor Demo Day — Spring 2026',
-        description: 'Top BIES-vetted startups pitch live to a curated audience of Bitcoin-native investors. Apply to present or register as an investor to attend.',
+        description: 'Top community-vetted startups pitch live to a curated audience of Bitcoin-native investors. Apply to present or register as an investor to attend.',
         category: 'DEMO_DAY',
         startDate: '2026-05-20T14:00:00Z',
         location: 'Virtual & In-Person — San Salvador',

@@ -63,8 +63,8 @@ const Navbar = () => {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Link to={isAuthenticated ? "/feed" : "/"} className="logo">
-            <img src={logoHorizontalWhite} alt="Build in El Salvador" className="logo-desktop" style={{ height: '40px' }} />
-            <img src={logoIconDark} alt="BIES" className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
+            <img src={logoHorizontalWhite} alt="Nostrbook" className="logo-desktop" style={{ height: '40px' }} />
+            <img src={logoIconDark} alt="Nostrbook" className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
           </Link>
         </div>
 
@@ -218,7 +218,7 @@ const Navbar = () => {
           <div className="mobile-overlay" onClick={() => setIsMenuOpen(false)} />
           <div className="mobile-drawer">
             <div className="mobile-drawer-header">
-              <img src={logoIconDark} alt="BIES" style={{ height: '32px' }} />
+              <img src={logoIconDark} alt="Nostrbook" style={{ height: '32px' }} />
               <button onClick={() => setIsMenuOpen(false)} style={{ color: 'white', background: 'none', border: 'none', fontSize: '1.5rem', padding: '8px', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0', display: 'flex', flexDirection: 'column' }}>

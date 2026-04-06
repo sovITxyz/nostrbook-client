@@ -19,7 +19,7 @@ import { getAssetUrl } from '../utils/assets';
 import { useSectionDrag, reorderArray } from '../hooks/useSectionDrag';
 
 const VISIBILITY_OPTIONS = [
-    { value: 'PUBLIC', label: 'Public', icon: <Globe size={15} />, desc: 'Visible to everyone on BIES' },
+    { value: 'PUBLIC', label: 'Public', icon: <Globe size={15} />, desc: 'Visible to everyone' },
     { value: 'LIMITED_SPACES', label: 'Limited Spaces', icon: <Users size={15} />, desc: 'Public listing — capacity is limited' },
     { value: 'INVITE_ONLY', label: 'Invite Only', icon: <UserCheck size={15} />, desc: 'Listed but RSVPs require an invite' },
     { value: 'PRIVATE', label: 'Private', icon: <Lock size={15} />, desc: 'Hidden from public — share via messages' },
@@ -56,7 +56,7 @@ const CreateEvent = () => {
         isOfficial: false,
         endorsementRequested: false,
         guestList: [],
-        nostrPublish: 'bies',
+        nostrPublish: 'community',
     });
 
     const [tags, setTags] = useState([]);
@@ -361,7 +361,7 @@ const CreateEvent = () => {
                         {nostrStatus === 'failed' && <AlertCircle size={16} />}
                         {nostrStatus === 'publishing' && 'Publishing to Nostr relays...'}
                         {nostrStatus === 'success' && 'Published to Nostr as NIP-52 calendar event'}
-                        {nostrStatus === 'failed' && 'Failed to publish to Nostr — event saved to BIES only'}
+                        {nostrStatus === 'failed' && 'Failed to publish to Nostr — event saved locally'}
                     </div>
                 )}
 
@@ -552,10 +552,10 @@ const CreateEvent = () => {
                                     </p>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                         {[
-                                            { value: 'none', label: 'Don\'t Publish', desc: 'Event stays on BIES only', color: 'var(--color-gray-500)', bg: 'var(--color-gray-50)', border: 'var(--color-gray-200)' },
-                                            { value: 'bies', label: 'BIES Relay Only', desc: 'Published to the private BIES relay', color: '#2563eb', bg: 'var(--color-blue-tint)', border: '#bfdbfe' },
+                                            { value: 'none', label: 'Don\'t Publish', desc: 'Event stays on platform only', color: 'var(--color-gray-500)', bg: 'var(--color-gray-50)', border: 'var(--color-gray-200)' },
+                                            { value: 'community', label: 'Community Relay Only', desc: 'Published to the community relay', color: '#2563eb', bg: 'var(--color-blue-tint)', border: '#bfdbfe' },
                                             { value: 'public', label: 'Public Relays', desc: 'Published to public Nostr relays (damus, primal, etc.)', color: '#16a34a', bg: 'var(--color-green-tint)', border: '#bbf7d0' },
-                                            { value: 'both', label: 'Both', desc: 'Published to BIES relay and public relays', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+                                            { value: 'both', label: 'Both', desc: 'Published to community relay and public relays', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                                         ].map(opt => (
                                             <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.75rem', border: `1px solid ${form.nostrPublish === opt.value ? opt.border : 'var(--color-gray-200)'}`, borderRadius: '8px', cursor: 'pointer', background: form.nostrPublish === opt.value ? opt.bg : 'var(--color-gray-50)', transition: 'all 0.15s' }}>
                                                 <input type="radio" name="nostrPublish" value={opt.value} checked={form.nostrPublish === opt.value} onChange={handleChange} style={{ display: 'none' }} />
@@ -592,7 +592,7 @@ const CreateEvent = () => {
                                 <div className="section-inner" style={{ padding: '1.5rem' }}>
                                     <h3 className="h3-title section-heading" style={{ fontSize: '1rem' }}>Guest List</h3>
                                     <MemberSearchSelect value={form.guestList} onChange={list => setForm(p => ({ ...p, guestList: list }))} />
-                                    <p style={{ fontSize: '0.73rem', color: 'var(--color-gray-500)', marginTop: '0.5rem' }}>Search and add BIES members to your guest list.</p>
+                                    <p style={{ fontSize: '0.73rem', color: 'var(--color-gray-500)', marginTop: '0.5rem' }}>Search and add community members to your guest list.</p>
                                 </div>
                             </div>
                         )}
@@ -629,7 +629,7 @@ const CreateEvent = () => {
                                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem', background: 'var(--color-orange-tint)', border: '1px solid #fed7aa', borderRadius: '8px', cursor: 'pointer', marginBottom: '0.75rem' }}>
                                             <input type="checkbox" name="isOfficial" checked={form.isOfficial} onChange={handleChange} style={{ marginTop: '2px', width: 16, height: 16, accentColor: 'var(--color-secondary)' }} />
                                             <div>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><ShieldCheck size={14} /> Official BIES Event</span>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><ShieldCheck size={14} /> Official Event</span>
                                                 <p style={{ fontSize: '0.73rem', color: '#b45309', margin: '0.2rem 0 0' }}>Official events appear prominently at the top of the events page.</p>
                                             </div>
                                         </label>
@@ -639,7 +639,7 @@ const CreateEvent = () => {
                                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem', background: 'var(--color-amber-tint)', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer' }}>
                                             <input type="checkbox" name="endorsementRequested" checked={form.endorsementRequested} onChange={handleChange} style={{ marginTop: '2px', width: 16, height: 16, accentColor: '#d97706' }} />
                                             <div>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><Award size={14} style={{ color: '#d97706' }} /> Request BIES Endorsement</span>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><Award size={14} style={{ color: '#d97706' }} /> Request Endorsement</span>
                                                 <p style={{ fontSize: '0.73rem', color: '#78350f', margin: '0.2rem 0 0' }}>Endorsed events receive a badge and increased visibility.</p>
                                             </div>
                                         </label>

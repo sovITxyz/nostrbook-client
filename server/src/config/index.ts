@@ -38,7 +38,7 @@ export const config = {
         region: process.env.S3_REGION || 'auto',
         accessKey: process.env.S3_ACCESS_KEY || '',
         secretKey: process.env.S3_SECRET_KEY || '',
-        bucket: process.env.S3_BUCKET || 'bies-uploads',
+        bucket: process.env.S3_BUCKET || 'nostrbook-uploads',
         publicUrl: process.env.S3_PUBLIC_URL || '',
     },
 
@@ -47,8 +47,15 @@ export const config = {
 
     // ─── Nostr ───────────────────────────────────────────────────────────────
     nostrPrivateRelay: process.env.NOSTR_PRIVATE_RELAY || '',
-    nostrPublicRelay: process.env.NOSTR_PUBLIC_RELAY || 'wss://bies.sovit.xyz/relay',
+    nostrPublicRelay: process.env.NOSTR_PUBLIC_RELAY || '',
     nostrRelays: (process.env.NOSTR_RELAYS || 'wss://relay.damus.io,wss://relay.primal.net,wss://nos.lol').split(','),
+
+    // ─── Community identity (WoT root for relay access) ─────────────────────
+    communityPrivkey: process.env.COMMUNITY_PRIVKEY || '',
+    communityPubkey: process.env.COMMUNITY_PUBKEY || '',
+
+    // ─── NIP-05 domain ──────────────────────────────────────────────────────
+    nip05Domain: process.env.NIP05_DOMAIN || '',
 
     // ─── Twitter/X (gallery-dl + browser cookies) ──────────────────────────
     twitterCookiesPath: process.env.TWITTER_COOKIES_PATH || '',
@@ -68,13 +75,13 @@ export const config = {
         port: parseInt(process.env.SMTP_PORT || '587', 10),
         user: process.env.SMTP_USER || '',
         pass: process.env.SMTP_PASS || '',
-        from: process.env.SMTP_FROM || 'noreply@bies.io',
+        from: process.env.SMTP_FROM || 'noreply@nostrbook.app',
     },
 
     // ─── Web Push (VAPID) — optional, for offline push notifications ────────
     vapid: {
         publicKey: process.env.VAPID_PUBLIC_KEY || '',
         privateKey: process.env.VAPID_PRIVATE_KEY || '',
-        subject: process.env.VAPID_SUBJECT || 'mailto:admin@bies.io',
+        subject: process.env.VAPID_SUBJECT || 'mailto:admin@nostrbook.app',
     },
 };

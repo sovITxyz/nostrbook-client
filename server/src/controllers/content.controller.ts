@@ -11,7 +11,7 @@ export const createArticleSchema = z.object({
     slug: z.string().min(1).max(200),
     excerpt: z.string().max(500).optional(),
     content: z.string().min(1),
-    category: z.enum(['NEWS', 'TUTORIAL', 'BIES_UPDATE', 'LEGAL', 'GUIDE']).default('NEWS'),
+    category: z.enum(['NEWS', 'TUTORIAL', 'PLATFORM_UPDATE', 'LEGAL', 'GUIDE']).default('NEWS'),
     thumbnail: z.string().url().optional().or(z.literal('')),
     authorName: z.string().optional(),
     isPublished: z.boolean().optional(),

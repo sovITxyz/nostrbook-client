@@ -1,20 +1,23 @@
-FROM dockurr/strfry:latest
+FROM node:20-alpine
 
-# Install jq for the write policy script
-RUN apk add --no-cache jq
+WORKDIR /app
 
-# Copy config and write policy
-COPY strfry.conf /etc/strfry.conf
-COPY write-policy.sh /app/write-policy.sh
-RUN chmod +x /app/write-policy.sh
+COPY package.json ./
+RUN npm install --omit=dev
 
-# Create data directories and non-root user
-RUN mkdir -p /app/strfry-db /app/data && \
-    addgroup -g 1001 relay && adduser -u 1001 -G relay -s /bin/sh -D relay && \
-    chown -R relay:relay /app/strfry-db /app/data /app/write-policy.sh
+COPY start.js ./
+
+RUN addgroup -g 1001 -S relay \
+    && adduser -u 1001 -S relay -G relay \
+    && mkdir -p /app/data \
+    && chown -R relay:relay /app
 
 USER relay
 
+ENV WS_PORT=7777
+ENV STORAGE_PATH=/app/data
+ENV SWARM_TOPIC=nostrbook
+
 EXPOSE 7777
 
-CMD ["/app/strfry", "relay", "--config=/etc/strfry.conf"]
+CMD ["node", "start.js"]

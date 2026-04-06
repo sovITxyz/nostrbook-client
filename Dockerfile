@@ -58,11 +58,11 @@ COPY version.json /app/version.json
 RUN mkdir -p uploads data dist/uploads \
     && rm -rf dist/uploads \
     && ln -s /app/uploads dist/uploads \
-    && addgroup -g 1001 -S bies \
-    && adduser -u 1001 -S bies -G bies \
-    && chown -R bies:bies /app
+    && addgroup -g 1001 -S nostrbook \
+    && adduser -u 1001 -S nostrbook -G nostrbook \
+    && chown -R nostrbook:nostrbook /app
 
-USER bies
+USER nostrbook
 
 ENV NODE_ENV=production
 ENV PORT=3001
@@ -81,7 +81,6 @@ RUN rm /etc/nginx/conf.d/default.conf
 
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=client-build /app/dist /usr/share/nginx/html
-COPY bugs/index.html /usr/share/nginx/html/bugs/index.html
 
 # Run nginx as non-root
 RUN chown -R nginx:nginx /usr/share/nginx/html \

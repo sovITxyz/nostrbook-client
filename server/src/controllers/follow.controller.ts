@@ -54,10 +54,10 @@ export async function followUser(req: Request, res: Response): Promise<void> {
             followerId,
         });
 
-        // Announce follow on the BIES feed
-        const followerName = follower?.profile?.name || 'A BIES member';
+        // Announce follow on the community feed
+        const followerName = follower?.profile?.name || 'A community member';
         const followedName = followed?.profile?.name || 'a builder';
-        publishAnnouncement(followerId, `${followerName} started following ${followedName} on BIES.`, [['t', 'follow']]).catch((err) =>
+        publishAnnouncement(followerId, `${followerName} started following ${followedName} on nostrbook.`, [['t', 'follow']]).catch((err) =>
             console.error('[Nostr] Follow announcement failed:', err)
         );
 

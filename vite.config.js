@@ -41,7 +41,6 @@ export default defineConfig({
             '/relay': {
                 target: 'ws://localhost:7777',
                 ws: true,
-                rewrite: () => '/',
                 // Suppress error logging when the local relay is not running
                 configure: (proxy) => {
                     proxy.on('error', () => {});
