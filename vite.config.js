@@ -39,7 +39,7 @@ export default defineConfig({
                 ws: true,
             },
             '/relay': {
-                target: 'ws://localhost:7777',
+                target: process.env.VITE_RELAY_TARGET || 'ws://localhost:7777',
                 ws: true,
                 // Suppress error logging when the local relay is not running
                 configure: (proxy) => {
