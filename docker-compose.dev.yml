@@ -1,0 +1,27 @@
+services:
+  bies-relay:
+    build:
+      context: ./relay
+    ports:
+      - "7777:7777"
+    volumes:
+      - relay-dev-data:/app/strfry-db
+      - ./relay/dev-whitelist:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  bies-translate:
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "5000:5000"
+    environment:
+      LT_LOAD_ONLY: "en,es"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  relay-dev-data:

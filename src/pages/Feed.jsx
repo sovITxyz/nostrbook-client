@@ -1,0 +1,1732 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
+import { Loader2, Send, Globe, Lock, Zap, TrendingUp, Flame, Clock, Calendar, X, ImagePlus, Smile, RefreshCw, Heart, ChevronDown } from 'lucide-react';
+import { nostrService, BIES_RELAY, profileCache } from '../services/nostrService';
+import { primalService, EXPLORE_VIEWS } from '../services/primalService';
+import { nostrSigner } from '../services/nostrSigner';
+import { blossomService } from '../services/blossomService';
+import { useAuth } from '../context/AuthContext';
+import { notificationsApi } from '../services/api';
+import NostrIcon from '../components/NostrIcon';
+import ZapModal from '../components/ZapModal';
+import EmojiPicker from '../components/EmojiPicker';
+import NostrGifPicker from '../components/NostrGifPicker';
+import { useLightbox } from '../context/LightboxContext';
+import { nip19 } from 'nostr-tools';
+import { Note, FeedSkeleton, Paginator } from '../components/feed';
+import { formatTime as formatTimeUtil, parseNoteContent as parseNoteContentUtil, getDisplayName as getDisplayNameUtil } from '../utils/noteUtils';
+import '../components/feed/Feed.css';
+
+const EXPLORE_ICONS = {
+    trending_24h: TrendingUp,
+    trending_4h: Flame,
+    trending_48h: Calendar,
+    trending_7d: TrendingUp,
+    mostzapped: Zap,
+    popular: Heart,
+    latest: Clock,
+};
+
+function formatCount(n) {
+    if (!n) return '0';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+}
+
+function formatSats(n) {
+    if (!n) return '0';
+    if (n >= 100000000) return (n / 100000000).toFixed(2).replace(/\.?0+$/, '') + ' BTC';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+}
+
+const Feed = () => {
+    const { user } = useAuth();
+    const { t } = useTranslation();
+    const location = useLocation();
+    const [posts, setPosts] = useState([]);
+    const [profiles, setProfiles] = useState({});
+    const [noteStats, setNoteStats] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [feedMode, setFeedMode] = useState('private'); // 'private' | 'explore'
+    const [exploreView, setExploreView] = useState('trending_24h');
+    const [exploreDropdownOpen, setExploreDropdownOpen] = useState(false);
+    const exploreDropdownRef = useRef(null);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [refreshing, setRefreshing] = useState(false);
+    const fetchedProfiles = useRef(new Set());
+
+    // Re-subscribe to the private relay when the page regains visibility.
+    // Mobile browsers kill WebSocket connections when backgrounded; the pool
+    // can't detect the dead WebSocket until a TCP timeout fires (seconds to
+    // minutes).  Force-closing the relay drops the stale connection so the
+    // next subscribeMany creates a fresh WebSocket and re-authenticates.
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible' && feedMode === 'private') {
+                nostrService.pool.close([BIES_RELAY]);
+                setRefreshKey(k => k + 1);
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+    }, [feedMode]);
+
+    // Close explore dropdown on click outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (exploreDropdownRef.current && !exploreDropdownRef.current.contains(e.target)) {
+                setExploreDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Compose state
+    const [composeText, setComposeText] = useState('');
+    const [broadcastPublic, setBroadcastPublic] = useState(false);
+    const manualRelayToggle = useRef(false);
+
+    // Sync compose relay default to match feed tab (user can still override)
+    useEffect(() => {
+        if (!manualRelayToggle.current) {
+            setBroadcastPublic(feedMode === 'explore');
+        }
+        manualRelayToggle.current = false;
+    }, [feedMode]);
+    const [posting, setPosting] = useState(false);
+    const [postError, setPostError] = useState('');
+    const [attachedFiles, setAttachedFiles] = useState([]); // { file, previewUrl, type, dimensions }
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef(null);
+
+    // Interaction state
+    const [likedNotes, setLikedNotes] = useState(new Set());
+    const [repostedNotes, setRepostedNotes] = useState(new Set());
+    const [replyTarget, setReplyTarget] = useState(null);
+    const [replyText, setReplyText] = useState('');
+    const [replyPosting, setReplyPosting] = useState(false);
+    const [zapTarget, setZapTarget] = useState(null);
+    const [myPubkey, setMyPubkey] = useState(null);
+    const [repostMenu, setRepostMenu] = useState(null); // post.id or null — shows repost relay choice
+    const [postMenu, setPostMenu] = useState(null); // post.id or null — shows "..." menu
+    const [deletingPost, setDeletingPost] = useState(null); // post.id being deleted
+    const [copyToast, setCopyToast] = useState(null); // toast message string
+
+    // Mention autocomplete
+    const [mentionResults, setMentionResults] = useState([]);
+    const [mentionLoading, setMentionLoading] = useState(false);
+    const [mentionAnchor, setMentionAnchor] = useState(null); // { field: 'compose'|'reply', startIndex }
+    const mentionSearchTimer = useRef(null);
+
+    // Comment section state
+    const [openComments, setOpenComments] = useState(new Set());
+    const [comments, setComments] = useState({});
+    const [loadingComments, setLoadingComments] = useState({});
+    const [visibleCommentCount, setVisibleCommentCount] = useState({});
+    const [likedComments, setLikedComments] = useState(new Set());
+    const fetchedComments = useRef(new Set());
+
+    // Emoji & GIF picker state
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showGifPicker, setShowGifPicker] = useState(false);
+    const [commentEmojiPicker, setCommentEmojiPicker] = useState(null); // post.id or null
+    const [commentGifPicker, setCommentGifPicker] = useState(null); // post.id or null
+    const composeInputRef = useRef(null);
+    const commentInputRefs = useRef({});
+
+    const currentView = EXPLORE_VIEWS.find(v => v.key === exploreView) || EXPLORE_VIEWS[0];
+
+    // Fetch own pubkey once on mount for reaction persistence and notifications
+    useEffect(() => {
+        nostrSigner.getPublicKey().then(pk => {
+            setMyPubkey(pk);
+            if (pk && !fetchedProfiles.current.has(pk)) {
+                fetchedProfiles.current.add(pk);
+                nostrService.getProfile(pk).then(p => {
+                    if (p) setProfiles(prev => ({ ...prev, [pk]: p }));
+                });
+            }
+        }).catch(() => {});
+    }, []);
+
+    // Scroll to a specific post when navigated from notifications
+    useEffect(() => {
+        const scrollToPost = location.state?.scrollToPost;
+        if (!scrollToPost || loading || feedMode !== 'private') return;
+        // Wait a tick for posts to render
+        const timer = setTimeout(() => {
+            const el = document.querySelector(`[data-post-id="${CSS.escape(scrollToPost)}"]`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.transition = 'box-shadow 0.3s';
+                el.style.boxShadow = '0 0 0 2px var(--color-secondary)';
+                setTimeout(() => { el.style.boxShadow = ''; }, 2000);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [location.state?.scrollToPost, loading, feedMode]);
+
+    // Sort notes based on the current explore view
+    const sortNotes = useCallback((notes, stats, viewKey) => {
+        const view = EXPLORE_VIEWS.find(v => v.key === viewKey);
+        if (!view) return notes;
+
+        return [...notes].sort((a, b) => {
+            const sa = stats[a.id] || {};
+            const sb = stats[b.id] || {};
+
+            if (view.timeframe === 'trending') {
+                return (sb.score24h || 0) - (sa.score24h || 0);
+            } else if (view.timeframe === 'popular') {
+                return (sb.score || 0) - (sa.score || 0);
+            } else if (view.timeframe === 'mostzapped') {
+                return (sb.satszapped || 0) - (sa.satszapped || 0);
+            }
+            return b.created_at - a.created_at;
+        });
+    }, []);
+
+    // Subscribe to private relay feed
+    const reconnectAttempts = useRef(0);
+
+    useEffect(() => {
+        if (feedMode !== 'private') return;
+
+        setPosts([]);
+        setProfiles({});
+        setNoteStats({});
+        setComments({});
+        setOpenComments(new Set());
+        setLoading(true);
+        fetchedProfiles.current.clear();
+        fetchedComments.current.clear();
+
+        let cancelled = false;
+        let reconnectTimer = null;
+        let sub = null;
+        let timeout = null;
+
+        // Collect pubkeys during streaming, batch-fetch profiles after EOSE.
+        // Post-EOSE live arrivals are debounced (300ms) and batched too.
+        const preEosePubkeys = [];
+        const liveQueue = new Set();
+        let debounceTimer = null;
+        let eoseFired = false;
+
+        const flushLiveProfiles = async () => {
+            if (liveQueue.size === 0) return;
+            const toFetch = [...liveQueue].filter(pk => !fetchedProfiles.current.has(pk));
+            toFetch.forEach(pk => fetchedProfiles.current.add(pk));
+            liveQueue.clear();
+            if (toFetch.length === 0) return;
+            const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+            if (profileMap.size > 0) {
+                setProfiles(prev => {
+                    const next = { ...prev };
+                    for (const [pk, p] of profileMap) next[pk] = p;
+                    return next;
+                });
+            }
+        };
+
+        // Ensure the signer is ready before subscribing so the NIP-42
+        // AUTH handshake can complete immediately (prevents proxy timeout).
+        const startSubscription = async () => {
+            try {
+                await nostrSigner.tryRestore();
+            } catch {
+                // Signer restore failed — subscribe anyway; the relay may
+                // still work if the extension is available.
+            }
+
+            if (cancelled) return;
+
+            timeout = setTimeout(() => setLoading(false), 15000);
+
+            sub = nostrService.pool.subscribeMany(
+                [BIES_RELAY],
+                { kinds: [1, 6], limit: 50 },
+                {
+                    onevent: (event) => {
+                        // Handle reposts (kind 6) — deduplicate by original note ID
+                        if (event.kind === 6) {
+                            let original;
+                            try { original = JSON.parse(event.content); } catch { return; }
+                            if (!original?.id || !original?.pubkey || !original?.content) return;
+                            const reposter = { pubkey: event.pubkey, timestamp: event.created_at, repostId: event.id };
+                            setPosts(prev => {
+                                // Skip if this exact repost event was already processed
+                                if (prev.some(p => p._reposters?.some(r => r.repostId === event.id))) return prev;
+                                // If original note already in feed, merge reposter into it
+                                const existingIdx = prev.findIndex(p => p.id === original.id);
+                                if (existingIdx !== -1) {
+                                    const existing = prev[existingIdx];
+                                    if (existing._reposters?.some(r => r.pubkey === event.pubkey)) return prev;
+                                    const updated = [...prev];
+                                    const reposters = [...(existing._reposters || []), reposter];
+                                    const repostTime = Math.max(existing._repostTime || 0, event.created_at);
+                                    updated[existingIdx] = { ...existing, _reposters: reposters, _repostTime: repostTime };
+                                    return updated.sort((a, b) => (b._repostTime || b.created_at) - (a._repostTime || a.created_at));
+                                }
+                                // New original note surfaced via repost
+                                const repostEvent = { ...original, _reposters: [reposter], _repostTime: event.created_at };
+                                return [...prev, repostEvent].sort((a, b) => (b._repostTime || b.created_at) - (a._repostTime || a.created_at));
+                            });
+                            if (!fetchedProfiles.current.has(event.pubkey)) {
+                                if (!eoseFired) { preEosePubkeys.push(event.pubkey); }
+                                else { liveQueue.add(event.pubkey); clearTimeout(debounceTimer); debounceTimer = setTimeout(flushLiveProfiles, 300); }
+                            }
+                            if (!fetchedProfiles.current.has(original.pubkey)) {
+                                if (!eoseFired) { preEosePubkeys.push(original.pubkey); }
+                                else { liveQueue.add(original.pubkey); clearTimeout(debounceTimer); debounceTimer = setTimeout(flushLiveProfiles, 300); }
+                            }
+                            clearTimeout(timeout);
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Skip machine-generated events (JSON metadata, protocol messages)
+                        const c = (event.content || '').trimStart();
+                        if (c.startsWith('{') || c.startsWith('xitchat-') || c.startsWith('[')) return;
+
+                        // Skip replies — events with 'e' tags are replies to other posts, not root posts
+                        if (event.tags.some(t => t[0] === 'e')) return;
+
+                        setPosts(prev => {
+                            // If this note already exists via a repost, update with full Kind 1 data but keep repost metadata
+                            const existingIdx = prev.findIndex(p => p.id === event.id);
+                            if (existingIdx !== -1) {
+                                const existing = prev[existingIdx];
+                                if (existing._reposters) {
+                                    const updated = [...prev];
+                                    updated[existingIdx] = { ...event, _reposters: existing._reposters, _repostTime: existing._repostTime };
+                                    return updated;
+                                }
+                                return prev;
+                            }
+                            return [...prev, event].sort((a, b) => (b._repostTime || b.created_at) - (a._repostTime || a.created_at));
+                        });
+                        clearTimeout(timeout);
+                        setLoading(false);
+
+                        if (!fetchedProfiles.current.has(event.pubkey)) {
+                            if (!eoseFired) {
+                                preEosePubkeys.push(event.pubkey);
+                            } else {
+                                liveQueue.add(event.pubkey);
+                                clearTimeout(debounceTimer);
+                                debounceTimer = setTimeout(flushLiveProfiles, 300);
+                            }
+                        }
+                    },
+                    oneose: async () => {
+                        eoseFired = true;
+                        reconnectAttempts.current = 0; // Reset backoff on success
+                        setLoading(false);
+                        clearTimeout(debounceTimer);
+                        const toFetch = [...new Set(preEosePubkeys)].filter(pk => !fetchedProfiles.current.has(pk));
+                        toFetch.forEach(pk => fetchedProfiles.current.add(pk));
+                        if (toFetch.length === 0) return;
+
+                        // Instantly hydrate from localStorage cache
+                        const cached = profileCache.getMany(toFetch);
+                        if (cached.size > 0) {
+                            setProfiles(prev => {
+                                const next = { ...prev };
+                                for (const [pk, p] of cached) next[pk] = p;
+                                return next;
+                            });
+                        }
+
+                        // Fetch from BIES relay only (local, fast)
+                        const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+                        if (profileMap.size > 0) {
+                            setProfiles(prev => {
+                                const next = { ...prev };
+                                for (const [pk, p] of profileMap) next[pk] = p;
+                                return next;
+                            });
+                        }
+                    },
+                    onclose: () => {
+                        setLoading(false);
+                        // Auto-reconnect with exponential backoff
+                        // (nginx timeout, mobile network switch, cell handoff).
+                        if (!cancelled) {
+                            const attempt = reconnectAttempts.current;
+                            const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
+                            reconnectAttempts.current = attempt + 1;
+                            console.log(`[Feed] Relay closed, reconnecting in ${delay}ms (attempt ${attempt + 1})`);
+                            reconnectTimer = setTimeout(() => {
+                                setRefreshKey(k => k + 1);
+                            }, delay);
+                        }
+                    },
+                    onauth: async (evt) => {
+                        try {
+                            return await nostrSigner.signEvent(evt);
+                        } catch {
+                            return undefined;
+                        }
+                    },
+                }
+            );
+        };
+
+        startSubscription();
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeout);
+            clearTimeout(debounceTimer);
+            clearTimeout(reconnectTimer);
+            if (sub) sub.close();
+        };
+    }, [feedMode, refreshKey]);
+
+    // Fetch ALL reactions for private relay posts — builds stats counts + marks user's own likes/reposts
+    const fetchedReactionIds = useRef(new Set());
+    useEffect(() => {
+        if (feedMode !== 'private' || posts.length === 0) return;
+
+        const postIds = posts.map(p => p.id).filter(id => !fetchedReactionIds.current.has(id));
+        if (postIds.length === 0) return;
+        postIds.forEach(id => fetchedReactionIds.current.add(id));
+        const likeCounts = {};
+        const repostCounts = {};
+        const replyCounts = {};
+        const userLiked = new Set();
+        const userReposted = new Set();
+
+        const sub = nostrService.pool.subscribeMany(
+            [BIES_RELAY, ...nostrService.relays],
+            { kinds: [7, 6, 1], '#e': postIds, limit: 2000 },
+            {
+                onevent: (event) => {
+                    const eTag = event.tags.find(t => t[0] === 'e');
+                    if (!eTag) return;
+                    const targetId = eTag[1];
+                    if (event.kind === 7) {
+                        likeCounts[targetId] = (likeCounts[targetId] || 0) + 1;
+                        if (myPubkey && event.pubkey === myPubkey) userLiked.add(targetId);
+                    } else if (event.kind === 6) {
+                        repostCounts[targetId] = (repostCounts[targetId] || 0) + 1;
+                        if (myPubkey && event.pubkey === myPubkey) userReposted.add(targetId);
+                    } else if (event.kind === 1) {
+                        replyCounts[targetId] = (replyCounts[targetId] || 0) + 1;
+                    }
+                },
+                oneose: () => {
+                    sub.close();
+                    // Build stats object
+                    const stats = {};
+                    for (const id of postIds) {
+                        if (likeCounts[id] || repostCounts[id] || replyCounts[id]) {
+                            stats[id] = {
+                                likes: likeCounts[id] || 0,
+                                reposts: repostCounts[id] || 0,
+                                replies: replyCounts[id] || 0,
+                            };
+                        }
+                    }
+                    setNoteStats(prev => ({ ...prev, ...stats }));
+                    if (userLiked.size) setLikedNotes(prev => new Set([...prev, ...userLiked]));
+                    if (userReposted.size) setRepostedNotes(prev => new Set([...prev, ...userReposted]));
+                },
+                onauth: async (evt) => { try { return await nostrSigner.signEvent(evt); } catch { return undefined; } },
+            }
+        );
+
+        return () => sub.close();
+    }, [feedMode, posts, myPubkey]);
+
+    // Reset reaction cache when switching feed modes
+    useEffect(() => {
+        fetchedReactionIds.current.clear();
+    }, [feedMode]);
+
+    // Ensure profiles are loaded for repost authors (catches missed/failed fetches)
+    const repostProfileRetries = useRef(new Set());
+    useEffect(() => {
+        const missing = posts
+            .flatMap(p => (p._reposters || []).map(r => r.pubkey))
+            .filter(pk => !profiles[pk]);
+        const unique = [...new Set(missing)].filter(pk => !repostProfileRetries.current.has(pk));
+        if (unique.length === 0) return;
+        unique.forEach(pk => repostProfileRetries.current.add(pk));
+        nostrService.getProfiles(unique).then(profileMap => {
+            if (profileMap.size > 0) {
+                setProfiles(prev => {
+                    const next = { ...prev };
+                    for (const [pk, p] of profileMap) next[pk] = p;
+                    return next;
+                });
+            }
+        });
+    }, [posts, profiles]);
+
+    // Fetch explore feed from Primal
+    useEffect(() => {
+        if (feedMode !== 'explore') return;
+
+        let cancelled = false;
+        setPosts([]);
+        setProfiles({});
+        setNoteStats({});
+        setComments({});
+        setOpenComments(new Set());
+        setLoading(true);
+        fetchedComments.current.clear();
+
+        (async () => {
+            try {
+                const opts = { limit: 30 };
+                if (myPubkey) opts.userPubkey = myPubkey;
+                const result = await primalService.fetchExploreFeed(currentView, opts);
+                if (cancelled) return;
+
+                setProfiles(result.profiles);
+                setNoteStats(result.stats);
+                setPosts(sortNotes(result.notes, result.stats, exploreView));
+
+                // Pre-populate liked/reposted state from Primal actions
+                if (result.actions) {
+                    const liked = new Set();
+                    const reposted = new Set();
+                    for (const [eventId, action] of Object.entries(result.actions)) {
+                        if (action.liked) liked.add(eventId);
+                        if (action.reposted) reposted.add(eventId);
+                    }
+                    if (liked.size) setLikedNotes(prev => new Set([...prev, ...liked]));
+                    if (reposted.size) setRepostedNotes(prev => new Set([...prev, ...reposted]));
+                }
+            } catch (err) {
+                console.error('[Feed] Primal fetch failed:', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [feedMode, exploreView, currentView, sortNotes, refreshKey]);
+
+    // Load more for explore feed
+    const handleLoadMore = async () => {
+        if (loadingMore || feedMode !== 'explore' || posts.length === 0) return;
+        setLoadingMore(true);
+        try {
+            const opts = { limit: 20 };
+            if (myPubkey) opts.userPubkey = myPubkey;
+            const result = await primalService.loadMore(currentView, posts, noteStats, opts);
+            if (result.notes.length > 0) {
+                setProfiles(prev => ({ ...prev, ...result.profiles }));
+                setNoteStats(prev => {
+                    const merged = { ...prev, ...result.stats };
+                    const allNotes = [...posts, ...result.notes];
+                    const deduped = allNotes.filter((n, i, arr) => arr.findIndex(x => x.id === n.id) === i);
+                    setPosts(sortNotes(deduped, merged, exploreView));
+                    return merged;
+                });
+                // Pre-populate liked/reposted for new posts
+                if (result.actions) {
+                    const liked = new Set();
+                    const reposted = new Set();
+                    for (const [eventId, action] of Object.entries(result.actions)) {
+                        if (action.liked) liked.add(eventId);
+                        if (action.reposted) reposted.add(eventId);
+                    }
+                    if (liked.size) setLikedNotes(prev => new Set([...prev, ...liked]));
+                    if (reposted.size) setRepostedNotes(prev => new Set([...prev, ...reposted]));
+                }
+            }
+        } catch (err) {
+            console.error('[Feed] Load more failed:', err);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
+    // Refresh feed — bumps refreshKey to re-trigger subscription/fetch effects.
+    // Force-close the relay first so the pool drops any stale WebSocket and
+    // establishes a fresh authenticated connection.
+    const handleRefreshFeed = useCallback(() => {
+        if (loading || refreshing) return;
+        setRefreshing(true);
+        if (feedMode === 'private') {
+            nostrService.pool.close([BIES_RELAY]);
+        }
+        setRefreshKey(k => k + 1);
+        setTimeout(() => setRefreshing(false), 1500);
+    }, [loading, refreshing, feedMode]);
+
+    const handleFileSelect = async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        setPostError('');
+
+        const newAttachments = [];
+        for (const file of files) {
+            const err = blossomService.validateFile(file, attachedFiles.length + newAttachments.length);
+            if (err) {
+                setPostError(err);
+                break;
+            }
+            const dimensions = await blossomService.getImageDimensions(file);
+            newAttachments.push({
+                file,
+                previewUrl: URL.createObjectURL(file),
+                type: file.type,
+                dimensions,
+            });
+        }
+
+        if (newAttachments.length > 0) {
+            setAttachedFiles(prev => [...prev, ...newAttachments]);
+        }
+    };
+
+    const removeAttachment = (index) => {
+        setAttachedFiles(prev => {
+            const updated = [...prev];
+            URL.revokeObjectURL(updated[index].previewUrl);
+            updated.splice(index, 1);
+            return updated;
+        });
+    };
+
+    const handlePost = async () => {
+        if ((!composeText.trim() && attachedFiles.length === 0) || posting || uploading) return;
+
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) {
+            setPostError('Nostr signing not available. Please log in with your Nostr account to post.');
+            return;
+        }
+
+        setPosting(true);
+        setPostError('');
+
+        try {
+            let content = composeText.trim();
+            const tags = [['t', 'bies']];
+
+            if (attachedFiles.length > 0) {
+                setUploading(true);
+                const uploadResults = await Promise.all(
+                    attachedFiles.map(a => blossomService.uploadFile(a.file))
+                );
+
+                const urls = uploadResults.map(r => r.url);
+                if (content) content += '\n';
+                content += urls.join('\n');
+
+                uploadResults.forEach((result, i) => {
+                    tags.push(blossomService.buildImetaTag(result, attachedFiles[i].file, attachedFiles[i].dimensions));
+                });
+            }
+
+            const event = {
+                kind: 1,
+                created_at: Math.floor(Date.now() / 1000),
+                tags,
+                content,
+            };
+
+            // Sign the event first so we can add it to the feed optimistically
+            const signedEvent = await nostrSigner.signEvent(event);
+
+            if (broadcastPublic) {
+                await Promise.any(nostrService.pool.publish(nostrService.relays, signedEvent));
+            } else {
+                await Promise.any(nostrService.pool.publish([BIES_RELAY], signedEvent));
+            }
+
+            // Optimistically add to feed so the user sees it immediately
+            setPosts(prev => {
+                if (prev.find(p => p.id === signedEvent.id)) return prev;
+                return [signedEvent, ...prev];
+            });
+
+            setComposeText('');
+            attachedFiles.forEach(a => URL.revokeObjectURL(a.previewUrl));
+            setAttachedFiles([]);
+        } catch (err) {
+            console.error('[Feed] Post failed:', err);
+            const msg = err?.errors?.[0]?.message || err?.message || String(err);
+            setPostError(`Post failed: ${msg}`);
+        } finally {
+            setPosting(false);
+            setUploading(false);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handlePost();
+        }
+    };
+
+    // Insert emoji at cursor in compose textarea
+    const handleComposeEmoji = (emoji) => {
+        const el = composeInputRef.current;
+        if (el) {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const newText = composeText.slice(0, start) + emoji + composeText.slice(end);
+            setComposeText(newText);
+            requestAnimationFrame(() => {
+                el.selectionStart = el.selectionEnd = start + emoji.length;
+                el.focus();
+            });
+        } else {
+            setComposeText(prev => prev + emoji);
+        }
+    };
+
+    // Insert emoji at cursor in comment textarea
+    const handleCommentEmoji = (postId, emoji) => {
+        const el = commentInputRefs.current[postId];
+        if (el) {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const current = (replyTarget?.id === postId ? replyText : '');
+            const newText = current.slice(0, start) + emoji + current.slice(end);
+            setReplyTarget({ id: postId, pubkey: replyTarget?.pubkey });
+            setReplyText(newText);
+            requestAnimationFrame(() => {
+                el.selectionStart = el.selectionEnd = start + emoji.length;
+                el.focus();
+            });
+        } else {
+            setReplyTarget({ id: postId, pubkey: replyTarget?.pubkey });
+            setReplyText(prev => prev + emoji);
+        }
+        setCommentEmojiPicker(null);
+    };
+
+    // Insert GIF URL into compose
+    const handleComposeGif = (url) => {
+        setComposeText(prev => prev ? prev + '\n' + url : url);
+        setShowGifPicker(false);
+    };
+
+    // Insert GIF URL into comment
+    const handleCommentGif = (postId, postPubkey, url) => {
+        setReplyTarget({ id: postId, pubkey: postPubkey });
+        setReplyText(prev => prev ? prev + '\n' + url : url);
+        setCommentGifPicker(null);
+    };
+
+    // Like a note (kind:7 reaction)
+    const handleLike = async (post) => {
+        if (likedNotes.has(post.id)) return;
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+
+        try {
+            const event = {
+                kind: 7,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ['e', post.id],
+                    ['p', post.pubkey],
+                ],
+                content: '+',
+            };
+            if (feedMode === 'private') {
+                await nostrService.publishToBiesRelay(event);
+            } else {
+                await nostrService.publishEvent(event);
+            }
+            setLikedNotes(prev => new Set(prev).add(post.id));
+            setNoteStats(prev => ({
+                ...prev,
+                [post.id]: { ...prev[post.id], likes: (prev[post.id]?.likes || 0) + 1 },
+            }));
+            // Notify the post author (fire-and-forget)
+            if (user) {
+                notificationsApi.feedInteraction({
+                    type: 'POST_LIKE',
+                    targetPubkey: post.pubkey,
+                    actorName: myPubkey ? getDisplayName(myPubkey) : '',
+                    eventId: post.id,
+                });
+            }
+        } catch (err) {
+            console.error('[Feed] Like failed:', err);
+        }
+    };
+
+    // Repost a note (kind:6) — relay: 'private' | 'public'
+    const handleRepost = async (post, relay) => {
+        if (repostedNotes.has(post.id)) return;
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+
+        setRepostMenu(null);
+        try {
+            const event = {
+                kind: 6,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ['e', post.id, ''],
+                    ['p', post.pubkey],
+                ],
+                content: JSON.stringify(post),
+            };
+            if (relay === 'private') {
+                await nostrService.publishToBiesRelay(event);
+            } else {
+                await nostrService.publishEvent(event);
+            }
+            setRepostedNotes(prev => new Set(prev).add(post.id));
+            setNoteStats(prev => ({
+                ...prev,
+                [post.id]: { ...prev[post.id], reposts: (prev[post.id]?.reposts || 0) + 1 },
+            }));
+        } catch (err) {
+            console.error('[Feed] Repost failed:', err);
+        }
+    };
+
+    // Reply to a note (kind:1 with e/p tags)
+    const handleReply = async (post) => {
+        if (!replyText.trim() || replyPosting) return;
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+
+        setReplyPosting(true);
+        try {
+            const content = replyText.trim();
+            const unsigned = {
+                kind: 1,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ['e', post.id, '', 'root'],
+                    ['p', post.pubkey],
+                ],
+                content,
+            };
+            const signed = await nostrSigner.signEvent(unsigned);
+            if (feedMode === 'private') {
+                await nostrService.publishToBiesRelay(signed);
+            } else {
+                await Promise.any(nostrService.pool.publish(nostrService.relays, signed));
+            }
+            setReplyText('');
+            setReplyTarget(null);
+            setNoteStats(prev => ({
+                ...prev,
+                [post.id]: { ...prev[post.id], replies: (prev[post.id]?.replies || 0) + 1 },
+            }));
+
+            // Add reply optimistically to local comment cache and open comments
+            setComments(prev => {
+                const existing = prev[post.id] || [];
+                if (existing.find(e => e.id === signed.id)) return prev;
+                return { ...prev, [post.id]: [...existing, signed].sort((a, b) => a.created_at - b.created_at) };
+            });
+            fetchedComments.current.add(post.id);
+            setOpenComments(prev => new Set(prev).add(post.id));
+
+            // Notify the post author (fire-and-forget)
+            if (user) {
+                const actorName = myPubkey ? getDisplayName(myPubkey) : '';
+                notificationsApi.feedInteraction({
+                    type: 'POST_COMMENT',
+                    targetPubkey: post.pubkey,
+                    actorName,
+                    eventId: post.id,
+                    contentPreview: content,
+                });
+                // If replying to a specific comment, also notify the comment author
+                if (replyTarget?.pubkey && replyTarget.pubkey !== post.pubkey) {
+                    notificationsApi.feedInteraction({
+                        type: 'COMMENT_REPLY',
+                        targetPubkey: replyTarget.pubkey,
+                        actorName,
+                        eventId: post.id,
+                        contentPreview: content,
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('[Feed] Reply failed:', err);
+        } finally {
+            setReplyPosting(false);
+        }
+    };
+
+    // Like a comment (kind:7 reaction targeting the comment event)
+    const handleCommentLike = async (comment) => {
+        if (likedComments.has(comment.id)) return;
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+
+        try {
+            const event = {
+                kind: 7,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ['e', comment.id],
+                    ['p', comment.pubkey],
+                ],
+                content: '+',
+            };
+            await nostrService.publishEvent(event);
+            setLikedComments(prev => new Set(prev).add(comment.id));
+            // Notify the comment author (fire-and-forget)
+            if (user) {
+                notificationsApi.feedInteraction({
+                    type: 'COMMENT_LIKE',
+                    targetPubkey: comment.pubkey,
+                    actorName: myPubkey ? getDisplayName(myPubkey) : '',
+                    eventId: comment.id,
+                });
+            }
+        } catch (err) {
+            console.error('[Feed] Comment like failed:', err);
+        }
+    };
+
+    // Reply to a comment — prefill the textarea with @npub and focus it
+    const handleCommentReply = (postId, comment) => {
+        const npub = nip19.npubEncode(comment.pubkey);
+        const mention = `nostr:${npub} `;
+        setReplyTarget({ id: postId, pubkey: comment.pubkey });
+        setReplyText(mention);
+        // Focus the textarea for this post
+        setTimeout(() => {
+            const el = commentInputRefs.current[postId];
+            if (el) {
+                el.focus();
+                el.setSelectionRange(mention.length, mention.length);
+            }
+        }, 50);
+    };
+
+    // Brief copy-confirmation toast
+    const showToast = (msg) => {
+        setCopyToast(msg);
+        setTimeout(() => setCopyToast(null), 2000);
+    };
+
+    // Share a note
+    const handleShare = async (post) => {
+        const noteId = nip19.noteEncode(post.id);
+        const url = `https://njump.me/${noteId}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({ url });
+            } catch { /* cancelled */ }
+        } else {
+            await navigator.clipboard.writeText(url);
+            showToast(t('feed.linkCopied', 'Link copied'));
+        }
+    };
+
+    // NIP-09: Request delete — publishes a kind:5 event referencing the target event
+    const handleDeletePost = async (post) => {
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+        setPostMenu(null);
+        setDeletingPost(post.id);
+        try {
+            const event = {
+                kind: 5,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [['e', post.id]],
+                content: 'Request delete',
+            };
+            // Publish delete request to both private and public relays
+            await nostrService.publishEvent(event);
+            try { await nostrService.publishToBiesRelay(event); } catch { /* best-effort */ }
+            // Remove from local feed
+            setPosts(prev => prev.filter(p => p.id !== post.id));
+        } catch (err) {
+            console.error('[Feed] Delete request failed:', err);
+        } finally {
+            setDeletingPost(null);
+        }
+    };
+
+    // Mute a user — add to local mute set (stored in localStorage)
+    const [mutedUsers, setMutedUsers] = useState(() => {
+        try { return new Set(JSON.parse(localStorage.getItem('bies_muted_users') || '[]')); }
+        catch { return new Set(); }
+    });
+
+    const handleMuteUser = (pubkey) => {
+        setMutedUsers(prev => {
+            const next = new Set(prev).add(pubkey);
+            localStorage.setItem('bies_muted_users', JSON.stringify([...next]));
+            return next;
+        });
+    };
+
+    // Report content — NIP-56 kind:1984 report event
+    const handleReport = async (post) => {
+        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
+        setPostMenu(null);
+        try {
+            const event = {
+                kind: 1984,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ['e', post.id, 'spam'],
+                    ['p', post.pubkey],
+                ],
+                content: '',
+            };
+            await nostrService.publishEvent(event);
+            try { await nostrService.publishToBiesRelay(event); } catch { /* best-effort */ }
+        } catch (err) {
+            console.error('[Feed] Report failed:', err);
+        }
+    };
+
+    const formatTime = formatTimeUtil;
+
+    const getDisplayName = (pubkey) => getDisplayNameUtil(pubkey, profiles);
+
+
+    const getAvatar = (pubkey) => {
+        return profiles[pubkey]?.picture || null;
+    };
+
+    // Mention autocomplete: detect @query in textarea and search profiles
+    const handleMentionInput = useCallback((text, caretPos, field) => {
+        const before = text.slice(0, caretPos);
+        const match = before.match(/@(\S*)$/);
+        if (match) {
+            const query = match[1];
+            setMentionAnchor({ field, startIndex: caretPos - match[0].length });
+            if (mentionSearchTimer.current) clearTimeout(mentionSearchTimer.current);
+            if (query.length >= 2) {
+                setMentionLoading(true);
+                setMentionResults([]);
+                mentionSearchTimer.current = setTimeout(async () => {
+                    try {
+                        const results = await nostrService.searchProfiles(query, 6);
+                        setMentionResults(results);
+                    } catch {
+                        setMentionResults([]);
+                    } finally {
+                        setMentionLoading(false);
+                    }
+                }, 350);
+            } else {
+                setMentionResults([]);
+                setMentionLoading(false);
+            }
+        } else {
+            setMentionAnchor(null);
+            setMentionResults([]);
+            setMentionLoading(false);
+        }
+    }, []);
+
+    const handleMentionSelect = (profile) => {
+        if (!mentionAnchor) return;
+        const npub = nip19.npubEncode(profile.pubkey);
+        const mention = `nostr:${npub} `;
+        const insertMention = (prev) => {
+            const before = prev.slice(0, mentionAnchor.startIndex);
+            const after = prev.slice(mentionAnchor.startIndex).replace(/^@\S*/, '');
+            return before + mention + after;
+        };
+        if (mentionAnchor.field === 'compose') {
+            setComposeText(insertMention);
+        } else {
+            setReplyText(insertMention);
+        }
+        // Cache the mentioned profile so their name renders inline
+        if (profile.name || profile.display_name) {
+            setProfiles(prev => ({ ...prev, [profile.pubkey]: { ...prev[profile.pubkey], ...profile } }));
+        }
+        setMentionAnchor(null);
+        setMentionResults([]);
+        setMentionLoading(false);
+    };
+
+    // Render note text with nostr:npub mentions as styled @name spans
+    const renderContent = (text) => {
+        if (!text) return null;
+        const parts = text.split(/(nostr:npub[a-z0-9]+)/gi);
+        return parts.map((part, i) => {
+            if (/^nostr:npub[a-z0-9]+$/i.test(part)) {
+                const npubStr = part.slice(6); // strip "nostr:"
+                try {
+                    const decoded = nip19.decode(npubStr);
+                    if (decoded.type === 'npub') {
+                        return <span key={i} className="note-mention">@{getDisplayName(decoded.data)}</span>;
+                    }
+                } catch { /* fall through */ }
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
+
+    // Only show root posts — filter out replies (events with 'e' tags referencing other events)
+    // Show root posts + reposts, filter out muted users
+    const rootPosts = useMemo(() => posts.filter(p => {
+        if (mutedUsers.has(p.pubkey)) return false;
+        // If note was surfaced only via repost and all reposters are muted, hide it
+        if (p._reposters?.length > 0 && p._reposters.every(r => mutedUsers.has(r.pubkey))) return false;
+        return p._reposters?.length > 0 || !p.tags?.some(t => t[0] === 'e');
+    }), [posts, mutedUsers]);
+
+    const getStats = (noteId) => noteStats[noteId] || {};
+
+    const loadComments = useCallback(async (postId) => {
+        if (fetchedComments.current.has(postId)) return;
+        fetchedComments.current.add(postId);
+        setLoadingComments(prev => ({ ...prev, [postId]: true }));
+
+        // For private relay feed, subscribe directly to BIES relay for replies
+        if (feedMode === 'private') {
+            const commentPubkeys = [];
+            const sub = nostrService.pool.subscribeMany(
+                [BIES_RELAY],
+                { kinds: [1], '#e': [postId], limit: 100 },
+                {
+                    onevent: (event) => {
+                        if (!fetchedProfiles.current.has(event.pubkey)) {
+                            commentPubkeys.push(event.pubkey);
+                        }
+                        setComments(prev => {
+                            const existing = prev[postId] || [];
+                            if (existing.find(e => e.id === event.id)) return prev;
+                            return { ...prev, [postId]: [...existing, event].sort((a, b) => a.created_at - b.created_at) };
+                        });
+                    },
+                    oneose: async () => {
+                        sub.close();
+                        setLoadingComments(prev => ({ ...prev, [postId]: false }));
+                        const toFetch = [...new Set(commentPubkeys)].filter(pk => !fetchedProfiles.current.has(pk));
+                        toFetch.forEach(pk => fetchedProfiles.current.add(pk));
+                        if (toFetch.length === 0) return;
+                        const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+                        if (profileMap.size > 0) {
+                            setProfiles(prev => {
+                                const next = { ...prev };
+                                for (const [pk, p] of profileMap) next[pk] = p;
+                                return next;
+                            });
+                        }
+                    },
+                    onclose: () => setLoadingComments(prev => ({ ...prev, [postId]: false })),
+                    onauth: async (evt) => { try { return await nostrSigner.signEvent(evt); } catch { return undefined; } },
+                }
+            );
+            return;
+        }
+
+        try {
+            const result = await primalService.fetchReplies(postId, { limit: 100 });
+
+            // Merge profiles from reply authors
+            if (Object.keys(result.profiles).length > 0) {
+                setProfiles(prev => ({ ...prev, ...result.profiles }));
+                for (const pubkey of Object.keys(result.profiles)) {
+                    fetchedProfiles.current.add(pubkey);
+                }
+            }
+
+            // Set comments sorted by time
+            if (result.notes.length > 0) {
+                const sorted = result.notes.sort((a, b) => a.created_at - b.created_at);
+                setComments(prev => {
+                    const existing = prev[postId] || [];
+                    const merged = [...existing];
+                    for (const note of sorted) {
+                        if (!merged.find(e => e.id === note.id)) {
+                            merged.push(note);
+                        }
+                    }
+                    merged.sort((a, b) => a.created_at - b.created_at);
+                    return { ...prev, [postId]: merged };
+                });
+            }
+        } catch (err) {
+            console.error('[Feed] Failed to load comments via Primal:', err);
+            // Remove from cache so user can retry
+            fetchedComments.current.delete(postId);
+        } finally {
+            setLoadingComments(prev => ({ ...prev, [postId]: false }));
+        }
+    }, [feedMode]);
+
+    const toggleComments = (postId) => {
+        setOpenComments(prev => {
+            const next = new Set(prev);
+            if (next.has(postId)) {
+                next.delete(postId);
+            } else {
+                next.add(postId);
+                loadComments(postId);
+            }
+            return next;
+        });
+    };
+
+    // Close repost menu and post menu on outside click
+    useEffect(() => {
+        if (!repostMenu && !postMenu) return;
+        const handler = (e) => {
+            if (repostMenu && !e.target.closest('.repost-wrapper')) setRepostMenu(null);
+            if (postMenu && !e.target.closest('.note-menu-wrapper')) setPostMenu(null);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [repostMenu, postMenu]);
+
+    // Lightbox (global)
+    const lightbox = useLightbox();
+    const openLightbox = (src, gallery = []) => lightbox.open(src, gallery);
+
+    // Parse note content: separate text, images, and other media
+    const parseNoteContent = parseNoteContentUtil;
+
+
+
+    // Render other media (video, audio, youtube)
+    const renderOtherMediaInline = (media) => {
+        if (!media || media.length === 0) return null;
+        return (
+            <div className="primal-note-media">
+                {media.map((m, i) => {
+                    if (m.type === 'video') {
+                        return <video key={i} src={m.url} controls className="primal-note-video" preload="metadata" />;
+                    }
+                    if (m.type === 'audio') {
+                        return <audio key={i} src={m.url} controls className="primal-note-audio" preload="metadata" />;
+                    }
+                    if (m.type === 'youtube') {
+                        return (
+                            <iframe
+                                key={i}
+                                className="primal-note-youtube"
+                                src={`https://www.youtube-nocookie.com/embed/${m.id}`}
+                                title="YouTube video"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                loading="lazy"
+                            />
+                        );
+                    }
+                    return null;
+                })}
+            </div>
+        );
+    };
+
+    return (
+        <div className="primal-feed-page">
+            {copyToast && <div className="primal-copy-toast">{copyToast}</div>}
+            <div className="primal-feed-container">
+                {/* Feed header */}
+                <div className="primal-feed-header">
+                    <div className="primal-feed-title">
+                        <NostrIcon size={22} />
+                        <span>{t('feed.biesFeed', 'BIES Feed')}</span>
+                    </div>
+                    <div className="primal-feed-tabs">
+                        <button
+                            className={`primal-feed-tab ${feedMode === 'private' ? 'active' : ''}`}
+                            onClick={() => setFeedMode('private')}
+                            data-testid="tab-private"
+                        >
+                            <Lock size={15} className="primal-feed-tab-icon" />
+                            <span>{t('feed.privateRelay', 'Private Relay')}</span>
+                        </button>
+                        <button
+                            className={`primal-feed-tab ${feedMode === 'explore' ? 'active' : ''}`}
+                            onClick={() => setFeedMode('explore')}
+                            data-testid="tab-explore"
+                        >
+                            <Globe size={15} className="primal-feed-tab-icon" />
+                            <span>{t('feed.explore', 'Explore')}</span>
+                        </button>
+                        <button
+                            className={`primal-feed-refresh${refreshing ? ' spinning' : ''}`}
+                            onClick={handleRefreshFeed}
+                            disabled={loading || refreshing}
+                            title={t('feed.refresh', 'Refresh feed')}
+                        >
+                            <RefreshCw size={15} />
+                        </button>
+                    </div>
+
+                    {/* Explore dropdown */}
+                    {feedMode === 'explore' && (
+                        <div className="primal-explore-dropdown" ref={exploreDropdownRef} data-testid="explore-tabs">
+                            <button
+                                className="primal-explore-dropdown-trigger"
+                                onClick={() => setExploreDropdownOpen(o => !o)}
+                            >
+                                {(() => {
+                                    const active = EXPLORE_VIEWS.find(v => v.key === exploreView);
+                                    const Icon = EXPLORE_ICONS[exploreView];
+                                    return (
+                                        <>
+                                            <Icon size={14} />
+                                            <span>{active?.label}</span>
+                                            <ChevronDown size={14} className={`primal-explore-chevron${exploreDropdownOpen ? ' open' : ''}`} />
+                                        </>
+                                    );
+                                })()}
+                            </button>
+                            {exploreDropdownOpen && (
+                                <div className="primal-explore-dropdown-menu">
+                                    {EXPLORE_VIEWS.map(view => {
+                                        const Icon = EXPLORE_ICONS[view.key];
+                                        return (
+                                            <button
+                                                key={view.key}
+                                                className={`primal-explore-dropdown-item${exploreView === view.key ? ' active' : ''}`}
+                                                onClick={() => {
+                                                    setExploreView(view.key);
+                                                    setExploreDropdownOpen(false);
+                                                }}
+                                            >
+                                                <Icon size={14} />
+                                                <span>{view.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Compose box */}
+                <div className="primal-compose">
+                    <div className="primal-compose-row">
+                        <div className="primal-compose-avatar">
+                            {user?.profile?.avatar ? (
+                                <img src={user.profile.avatar} alt="" />
+                            ) : (
+                                <NostrIcon size={18} />
+                            )}
+                        </div>
+                        <textarea
+                            ref={composeInputRef}
+                            className="primal-compose-input"
+                            placeholder={t('feed.whatsHappening', "What's on your mind?")}
+                            value={composeText}
+                            onChange={(e) => {
+                                setComposeText(e.target.value);
+                                handleMentionInput(e.target.value, e.target.selectionStart, 'compose');
+                            }}
+                            onKeyDown={handleKeyDown}
+                            onBlur={() => setTimeout(() => setMentionAnchor(null), 150)}
+                            rows={2}
+                            data-testid="compose-input"
+                        />
+                    </div>
+
+                    {/* Mention dropdown */}
+                    {mentionAnchor?.field === 'compose' && (mentionResults.length > 0 || mentionLoading) && (
+                        <div className="primal-mention-dropdown">
+                            {mentionLoading && mentionResults.length === 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', color: 'var(--feed-text-tertiary)', fontSize: 13 }}>
+                                    <Loader2 size={12} className="spin" /> {t('feed.searching', 'Searching...')}
+                                </div>
+                            )}
+                            {mentionResults.map(p => (
+                                <button key={p.pubkey} className="primal-mention-item" onMouseDown={(e) => { e.preventDefault(); handleMentionSelect(p); }}>
+                                    {p.picture ? (
+                                        <img src={p.picture} className="primal-mention-avatar" alt="" />
+                                    ) : (
+                                        <div className="primal-mention-avatar-placeholder"><NostrIcon size={12} /></div>
+                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                        <span className="primal-mention-name">{p.display_name || p.name || p.pubkey.slice(0, 10)}</span>
+                                        {p.nip05 && <span className="primal-mention-nip05">{p.nip05}</span>}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Media preview */}
+                    {attachedFiles.length > 0 && (
+                        <div className="primal-compose-media-preview">
+                            {attachedFiles.map((item, i) => (
+                                <div key={i} className="primal-compose-media-item">
+                                    {item.type.startsWith('image/') ? (
+                                        <img src={item.previewUrl} alt="" />
+                                    ) : (
+                                        <video src={item.previewUrl} muted />
+                                    )}
+                                    <button className="primal-compose-media-remove" onClick={() => removeAttachment(i)}>
+                                        <X size={10} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {postError && <div className="primal-compose-error">{postError}</div>}
+
+                    <div className="primal-compose-bottom">
+                        <button
+                            className={`primal-compose-relay-toggle ${broadcastPublic ? 'public' : 'private'}`}
+                            onClick={() => { manualRelayToggle.current = true; setBroadcastPublic(!broadcastPublic); }}
+                            title={broadcastPublic ? t('feed.broadcastingPublic', 'Broadcasting to all relays') : t('feed.privateRelayOnly', 'Private relay only')}
+                        >
+                            {broadcastPublic ? <Globe size={13} /> : <Lock size={13} />}
+                            <span>{broadcastPublic ? t('feed.public', 'Public') : t('feed.private', 'Private')}</span>
+                        </button>
+
+                        <div className="primal-compose-actions">
+                            <button
+                                className="primal-compose-btn"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Attach image or video"
+                                disabled={attachedFiles.length >= blossomService.MAX_ATTACHMENTS || posting || uploading}
+                            >
+                                <ImagePlus size={18} />
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*,video/*"
+                                multiple
+                                style={{ display: 'none' }}
+                                onChange={handleFileSelect}
+                            />
+                            <div className="picker-anchor">
+                                <button
+                                    className="primal-compose-btn"
+                                    onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }}
+                                    title="Emoji"
+                                >
+                                    <Smile size={18} />
+                                </button>
+                                {showEmojiPicker && (
+                                    <EmojiPicker
+                                        onSelect={(emoji) => handleComposeEmoji(emoji)}
+                                        onClose={() => setShowEmojiPicker(false)}
+                                    />
+                                )}
+                            </div>
+                            <div className="picker-anchor">
+                                <button
+                                    className="primal-compose-btn"
+                                    onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
+                                    title="GIF"
+                                >
+                                    <span className="gif-label">GIF</span>
+                                </button>
+                                {showGifPicker && (
+                                    <NostrGifPicker
+                                        onSelect={handleComposeGif}
+                                        onClose={() => setShowGifPicker(false)}
+                                        dropDown
+                                    />
+                                )}
+                            </div>
+                            <button
+                                className="primal-compose-post-btn"
+                                onClick={handlePost}
+                                disabled={(!composeText.trim() && attachedFiles.length === 0) || posting || uploading}
+                                data-testid="post-btn"
+                            >
+                                {(posting || uploading) ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+                                <span>{uploading ? t('feed.uploading', 'Uploading...') : posting ? t('feed.posting', 'Posting...') : t('feed.post', 'Post')}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Feed content */}
+                {loading && rootPosts.length === 0 ? (
+                    <FeedSkeleton count={5} />
+                ) : rootPosts.length === 0 ? (
+                    <div className="primal-feed-empty" data-testid="feed-empty">
+                        <NostrIcon size={40} />
+                        <h3>{t('feed.noPostsTitle', 'No posts yet')}</h3>
+                        <p>
+                            {feedMode === 'private'
+                                ? t('feed.noPostsPrivate', 'Be the first to post on the private relay!')
+                                : t('feed.noPostsExplore', 'Nothing to show right now.')}
+                        </p>
+                        {feedMode === 'private' && (
+                            <button className="primal-try-public-btn" onClick={() => setFeedMode('explore')}>
+                                <Globe size={14} /> {t('feed.exploreNostr', 'Explore Nostr')}
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div data-testid="feed-list">
+                        {rootPosts.map(post => {
+                            const stats = getStats(post.id);
+                            const isLiked = likedNotes.has(post.id);
+                            const isReposted = repostedNotes.has(post.id) || post._reposters?.some(r => r.pubkey === myPubkey);
+                            const isReplying = replyTarget?.id === post.id;
+                            const isCommentsOpen = openComments.has(post.id);
+                            const postComments = comments[post.id] || [];
+                            const isOwnPost = myPubkey && post.pubkey === myPubkey;
+
+                            return (
+                                <Note
+                                    key={post.id}
+                                    post={post}
+                                    profiles={profiles}
+                                    stats={stats}
+                                    isLiked={isLiked}
+                                    isReposted={isReposted}
+                                    isCommentsOpen={isCommentsOpen}
+                                    isOwnPost={isOwnPost}
+                                    myPubkey={myPubkey}
+                                    postMenuOpen={postMenu === post.id}
+                                    repostMenuOpen={repostMenu === post.id}
+                                    onToggleComments={() => toggleComments(post.id)}
+                                    onLike={() => handleLike(post)}
+                                    onRepostMenuToggle={() => {
+                                        if (isReposted) return;
+                                        setRepostMenu(repostMenu === post.id ? null : post.id);
+                                    }}
+                                    onRepost={(relay) => handleRepost(post, relay)}
+                                    onZap={() => setZapTarget({
+                                        pubkey: post.pubkey,
+                                        name: getDisplayName(post.pubkey),
+                                        avatar: getAvatar(post.pubkey),
+                                        lud16: profiles[post.pubkey]?.lud16,
+                                        eventId: post.id,
+                                    })}
+                                    onShare={() => handleShare(post)}
+                                    onPostMenuToggle={() => {
+                                        setPostMenu(postMenu === post.id ? null : post.id);
+                                    }}
+                                    onDeletePost={() => handleDeletePost(post)}
+                                    onMuteUser={() => { handleMuteUser(post.pubkey); setPostMenu(null); }}
+                                    onReport={() => { handleReport(post); setPostMenu(null); }}
+                                    onCopyLink={() => { navigator.clipboard.writeText(`https://njump.me/${nip19.noteEncode(post.id)}`); setPostMenu(null); showToast(t('feed.linkCopied', 'Link copied')); }}
+                                    onCopyText={() => { navigator.clipboard.writeText(post.content || ''); setPostMenu(null); showToast(t('feed.textCopied', 'Text copied')); }}
+                                    onCopyId={() => { navigator.clipboard.writeText(post.id); setPostMenu(null); showToast(t('feed.idCopied', 'Note ID copied')); }}
+                                    onCopyRaw={() => { navigator.clipboard.writeText(JSON.stringify(post, null, 2)); setPostMenu(null); showToast(t('feed.rawCopied', 'Raw data copied')); }}
+                                    parseNoteContent={parseNoteContent}
+                                    formatTime={formatTime}
+                                    formatCount={formatCount}
+                                    formatSats={formatSats}
+                                    getDisplayName={getDisplayName}
+                                    getAvatar={getAvatar}
+                                    onImageClick={openLightbox}
+                                    renderOtherMedia={renderOtherMediaInline}
+                                    t={t}
+                                >
+                                    {/* Comment section — rendered as children inside Note */}
+                                    {isCommentsOpen && (
+                                        <div className="primal-comments">
+                                            {/* Reply compose */}
+                                            <div className="primal-comment-compose">
+                                                <div className="primal-avatar primal-avatar-sm">
+                                                    {user?.profile?.avatar ? (
+                                                        <img src={user.profile.avatar} alt="" />
+                                                    ) : (
+                                                        <NostrIcon size={13} />
+                                                    )}
+                                                </div>
+                                                <div className="primal-comment-input-row">
+                                                    <textarea
+                                                        ref={el => { commentInputRefs.current[post.id] = el; }}
+                                                        className="primal-comment-input"
+                                                        placeholder={t('feed.replyTo', { name: getDisplayName(post.pubkey) })}
+                                                        value={isReplying ? replyText : ''}
+                                                        onChange={(e) => {
+                                                            setReplyTarget({ id: post.id, pubkey: post.pubkey });
+                                                            setReplyText(e.target.value);
+                                                            handleMentionInput(e.target.value, e.target.selectionStart, 'reply');
+                                                        }}
+                                                        onFocus={() => setReplyTarget({ id: post.id, pubkey: post.pubkey })}
+                                                        onBlur={() => setTimeout(() => setMentionAnchor(null), 150)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(post); }
+                                                        }}
+                                                        rows={1}
+                                                    />
+                                                    <div className="primal-comment-picker-btns">
+                                                        <div className="picker-anchor">
+                                                            <button
+                                                                className="primal-comment-picker-btn"
+                                                                onClick={() => { setCommentEmojiPicker(commentEmojiPicker === post.id ? null : post.id); setCommentGifPicker(null); }}
+                                                            >
+                                                                <Smile size={14} />
+                                                            </button>
+                                                            {commentEmojiPicker === post.id && (
+                                                                <EmojiPicker
+                                                                    onSelect={(emoji) => handleCommentEmoji(post.id, emoji)}
+                                                                    onClose={() => setCommentEmojiPicker(null)}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        <div className="picker-anchor">
+                                                            <button
+                                                                className="primal-comment-picker-btn"
+                                                                onClick={() => { setCommentGifPicker(commentGifPicker === post.id ? null : post.id); setCommentEmojiPicker(null); }}
+                                                            >
+                                                                <span style={{ fontSize: 11, fontWeight: 700 }}>GIF</span>
+                                                            </button>
+                                                            {commentGifPicker === post.id && (
+                                                                <NostrGifPicker
+                                                                    onSelect={(url) => handleCommentGif(post.id, post.pubkey, url)}
+                                                                    onClose={() => setCommentGifPicker(null)}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        className="primal-comment-send"
+                                                        onClick={() => handleReply(post)}
+                                                        disabled={!isReplying || !replyText.trim() || replyPosting}
+                                                    >
+                                                        {replyPosting && isReplying ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Mention dropdown for replies */}
+                                            {isReplying && mentionAnchor?.field === 'reply' && (mentionResults.length > 0 || mentionLoading) && (
+                                                <div className="primal-mention-dropdown" style={{ marginLeft: 0 }}>
+                                                    {mentionLoading && mentionResults.length === 0 && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', color: 'var(--feed-text-tertiary)', fontSize: 13 }}>
+                                                            <Loader2 size={12} className="spin" /> {t('feed.searching', 'Searching...')}
+                                                        </div>
+                                                    )}
+                                                    {mentionResults.map(p => (
+                                                        <button key={p.pubkey} className="primal-mention-item" onMouseDown={(e) => { e.preventDefault(); handleMentionSelect(p); }}>
+                                                            {p.picture ? (
+                                                                <img src={p.picture} className="primal-mention-avatar" alt="" />
+                                                            ) : (
+                                                                <div className="primal-mention-avatar-placeholder"><NostrIcon size={12} /></div>
+                                                            )}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                                <span className="primal-mention-name">{p.display_name || p.name || p.pubkey.slice(0, 10)}</span>
+                                                                {p.nip05 && <span className="primal-mention-nip05">{p.nip05}</span>}
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {loadingComments[post.id] && postComments.length === 0 && (
+                                                <div className="primal-comment-loading">
+                                                    <Loader2 size={14} className="spin" /> {t('feed.loadingComments', 'Loading comments...')}
+                                                </div>
+                                            )}
+
+                                            {/* Comment list */}
+                                            {(() => {
+                                                const limit = visibleCommentCount[post.id] || 5;
+                                                const latest = postComments.slice(-limit).reverse();
+                                                const hiddenCount = postComments.length - limit;
+                                                return (
+                                                    <>
+                                                        {latest.map(comment => {
+                                                            const { text: ct, images: ci } = parseNoteContent(comment.content);
+                                                            return (
+                                                                <div key={comment.id} className="primal-comment">
+                                                                    <div className="primal-avatar primal-avatar-sm">
+                                                                        {getAvatar(comment.pubkey) ? (
+                                                                            <img src={getAvatar(comment.pubkey)} alt="" />
+                                                                        ) : (
+                                                                            <NostrIcon size={13} />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="primal-comment-body">
+                                                                        <div className="primal-comment-meta">
+                                                                            <span className="primal-comment-name">{getDisplayName(comment.pubkey)}</span>
+                                                                            <span className="primal-comment-time">{formatTime(comment.created_at)}</span>
+                                                                        </div>
+                                                                        {ct && <div className="primal-comment-text">{renderContent(ct)}</div>}
+                                                                        {ci.length > 0 && (
+                                                                            <div className="primal-comment-images">
+                                                                                {ci.map((src, idx) => (
+                                                                                    <img key={idx} src={src} alt="" onClick={(e) => { e.stopPropagation(); openLightbox(src, ci); }} />
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="primal-comment-actions">
+                                                                            <button className="primal-comment-action" onClick={() => handleCommentReply(post.id, comment)}>
+                                                                                Reply
+                                                                            </button>
+                                                                            <button
+                                                                                className={`primal-comment-action ${likedComments.has(comment.id) ? 'liked' : ''}`}
+                                                                                onClick={() => handleCommentLike(comment)}
+                                                                            >
+                                                                                Like
+                                                                            </button>
+                                                                            <button
+                                                                                className="primal-comment-action"
+                                                                                onClick={() => setZapTarget({
+                                                                                    pubkey: comment.pubkey,
+                                                                                    name: getDisplayName(comment.pubkey),
+                                                                                    avatar: getAvatar(comment.pubkey),
+                                                                                    eventId: comment.id,
+                                                                                })}
+                                                                            >
+                                                                                Zap
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+
+                                                        {hiddenCount > 0 && (
+                                                            <button
+                                                                className="primal-show-more-comments"
+                                                                onClick={() => setVisibleCommentCount(prev => ({
+                                                                    ...prev,
+                                                                    [post.id]: (prev[post.id] || 5) * 2,
+                                                                }))}
+                                                            >
+                                                                Show {Math.min(hiddenCount, limit)} more comments
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
+
+                                            {!loadingComments[post.id] && postComments.length === 0 && (
+                                                <div className="primal-comment-empty">{t('feed.noReplies', 'No replies yet')}</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </Note>
+                            );
+                        })}
+
+                        {/* Infinite scroll / load more */}
+                        {feedMode === 'explore' && rootPosts.length >= 10 && (
+                            <>
+                                <Paginator onIntersect={handleLoadMore} disabled={loadingMore} />
+                                {loadingMore && (
+                                    <div className="primal-feed-loading" style={{ padding: '20px' }}>
+                                        <Loader2 size={20} className="spin" />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Zap Modal */}
+                {zapTarget && (
+                    <ZapModal
+                        recipients={[{ pubkey: zapTarget.pubkey, name: zapTarget.name, avatar: zapTarget.avatar, lud16: zapTarget.lud16 }]}
+                        eventId={zapTarget.eventId}
+                        onClose={() => setZapTarget(null)}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default Feed;

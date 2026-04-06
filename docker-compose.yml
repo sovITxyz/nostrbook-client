@@ -1,0 +1,132 @@
+services:
+  bies-server:
+    build:
+      context: .
+      target: server
+    restart: unless-stopped
+    env_file: server/.env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: "file:../data/bies.db"
+      NOSTR_PRIVATE_RELAY: "ws://bies-relay:7777"
+      NOSTR_PUBLIC_RELAY: "wss://bies.sovit.xyz/relay"
+      BASE_PATH: ""
+      CORS_ORIGIN: "https://bies.sovit.xyz"
+      YOUTUBE_CHANNEL_ID: "UCBgvGPST3o9QWCqiSZOgjmQ"
+      TWITTER_COOKIES_PATH: "/app/twitter-cookies.txt"
+      ADMIN_PUBKEYS: "de7ab932ca17278b2144a6628c3531a0628fcc7b58074111d6e5b949ecb0e377,4e275e00e0b7d22b19b6cd236d28976f6db46b91f152ff384a71343918022256,d0e958dae5d5a0601948cbe029b44b38de123b233546cb171cbaefa5a3536807,9b6048edf6232bbd926d31ba7ee6047dbdf8832704f2b00ff1a11f880f2b3f24,e81e487350935264b2ee1a28472e0e76a56a3b011343a08e72ed8613a5dce9a4"
+    volumes:
+      - bies-data:/app/data
+      - bies-uploads:/app/uploads
+      - relay-whitelist:/app/relay-whitelist
+      - ./server/twitter-cookies.txt:/app/twitter-cookies.txt:ro
+    networks:
+      - bies-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  bies-relay:
+    build:
+      context: ./relay
+    restart: unless-stopped
+    volumes:
+      - relay-data:/app/strfry-db
+      - relay-whitelist:/app/data
+    networks:
+      - bies-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  bies-auth-proxy:
+    build:
+      context: ./relay-proxy
+    restart: unless-stopped
+    environment:
+      PROXY_PORT: "7778"
+      UPSTREAM_RELAY: "ws://bies-relay:7777"
+      WHITELIST_PATH: "/app/data/whitelist.txt"
+      RELAY_URL: "wss://bies.sovit.xyz/relay"
+      AUTH_TIMEOUT_MS: "60000"
+    volumes:
+      - relay-whitelist:/app/data:ro
+    networks:
+      - bies-net
+    depends_on:
+      - bies-relay
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  bies-bugs:
+    build:
+      context: ./bugs
+    restart: unless-stopped
+    volumes:
+      - bugs-data:/app/data
+    networks:
+      - bies-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  bies-translate:
+    image: libretranslate/libretranslate:latest
+    restart: unless-stopped
+    environment:
+      LT_LOAD_ONLY: "en,es"
+      LT_DISABLE_WEB_UI: "true"
+    networks:
+      - bies-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  bies-nginx:
+    build:
+      context: .
+      target: nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - bies-uploads:/app/uploads:ro
+    depends_on:
+      bies-server:
+        condition: service_healthy
+    networks:
+      - bies-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  bies-data:
+  bies-uploads:
+  bugs-data:
+  relay-data:
+  relay-whitelist:
+
+networks:
+  bies-net:
+    driver: bridge
