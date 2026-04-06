@@ -26,21 +26,17 @@ import profileRoutes from './routes/profile.routes';
 import projectRoutes from './routes/project.routes';
 import uploadRoutes from './routes/upload.routes';
 import messageRoutes from './routes/message.routes';
-import watchlistRoutes from './routes/watchlist.routes';
-import investmentRoutes from './routes/investment.routes';
 import notificationRoutes from './routes/notification.routes';
 import eventRoutes from './routes/events.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import searchRoutes from './routes/search.routes';
 import adminRoutes from './routes/admin.routes';
-import investorRoutes from './routes/investor.routes';
 import contactRoutes from './routes/contact.routes';
 import statsRoutes from './routes/stats.routes';
 import settingsRoutes from './routes/settings.routes';
 import contentRoutes from './routes/content.routes';
 import newsRoutes from './routes/news.routes';
 import mediaRoutes from './routes/media.routes';
-import matchRoutes from './routes/match.routes';
 import nip05Routes from './routes/nip05.routes';
 import walletRoutes from './routes/wallet.routes';
 
@@ -177,21 +173,17 @@ app.use('/api/profiles', profileRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/messages', messageRoutes);
-app.use('/api/watchlist', watchlistRoutes);
-app.use('/api/investments', investmentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/investors', investorRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
-app.use('/api/match', matchRoutes);
 app.use('/api/wallet', walletRoutes);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
@@ -210,7 +202,7 @@ attachWebSocketServer(server);
 server.listen(config.port, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════════╗
-║                  BIES Backend Server v${appVersion.padEnd(39)}║
+║              Nostrbook Backend Server v${appVersion.padEnd(39)}║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Server:   http://localhost:${config.port}                              ║
 ║  WS:       ws://localhost:${config.port}/ws                            ║
@@ -218,9 +210,8 @@ server.listen(config.port, () => {
 ║  ENV:      ${config.nodeEnv.padEnd(55)}║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Routes: auth | profiles | projects | upload | messages          ║
-║          watchlist | investments | notifications | events        ║
-║          analytics | search | admin | contact | stats            ║
-║          settings | content | news | match | websocket           ║
+║          notifications | events | analytics | search | admin     ║
+║          contact | stats | settings | content | news | media     ║
 ╚══════════════════════════════════════════════════════════════════╝
   `);
 

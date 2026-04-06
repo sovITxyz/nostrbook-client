@@ -3,7 +3,7 @@ import { Search, X, UserPlus, Loader2 } from 'lucide-react';
 import { profilesApi } from '../services/api';
 
 /**
- * MemberSearchSelect — search BIES members and build a guestlist.
+ * MemberSearchSelect — search community members and build a guestlist.
  *
  * Props:
  *   value: Array<{ name: string, userId: string, avatar?: string }>
@@ -101,7 +101,7 @@ const MemberSearchSelect = ({ value = [], onChange }) => {
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onFocus={() => results.length > 0 && setOpen(true)}
-                    placeholder="Search BIES members by name..."
+                    placeholder="Search members by name..."
                     className="search-input"
                     autoComplete="off"
                 />

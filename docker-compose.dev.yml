@@ -1,18 +1,23 @@
 services:
-  bies-relay:
+  nostrbook-relay:
     build:
       context: ./relay
     ports:
       - "7777:7777"
+    environment:
+      WS_PORT: "7777"
+      STORAGE_PATH: "/app/data"
+      SWARM_TOPIC: "nostrbook-dev"
+      RELAY_NAME: "nostrbook-dev"
+      WOT_DISCOVERY: "true"
     volumes:
-      - relay-dev-data:/app/strfry-db
-      - ./relay/dev-whitelist:/app/data
+      - relay-dev-data:/app/data
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
 
-  bies-translate:
+  nostrbook-translate:
     image: libretranslate/libretranslate:latest
     ports:
       - "5000:5000"

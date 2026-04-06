@@ -158,7 +158,7 @@ const Signup = () => {
                     <div className="text-center">
                         <h2 className="text-2xl font-bold mb-4">Create Your Identity</h2>
                         <p className="text-gray-500 mb-8">
-                            BIES uses Nostr-native authentication. No passwords. No emails. Just cryptographic keys you truly own.
+                            Nostrbook uses Nostr-native authentication. No passwords. No emails. Just cryptographic keys you truly own.
                         </p>
                         <button onClick={generateKeys} className="btn-primary w-full py-3 rounded-full">
                             Generate My Keys
@@ -325,7 +325,7 @@ const Signup = () => {
                         </div>
 
                         <div className="mb-4">
-                            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-gray-700)' }}>Choose your BIES identity</label>
+                            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-gray-700)' }}>Choose your identity</label>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                                 <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
                                     <AtSign size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-gray-400)' }} />
@@ -344,7 +344,7 @@ const Signup = () => {
                             </div>
                             {nip05Name && (
                                 <p className="text-xs" style={{ marginTop: '0.25rem', color: nip05Available === false ? '#ef4444' : 'var(--color-gray-400)' }}>
-                                    {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@bies.sovit.xyz`}
+                                    {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`}
                                 </p>
                             )}
                         </div>

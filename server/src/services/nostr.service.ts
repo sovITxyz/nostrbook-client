@@ -118,7 +118,7 @@ export async function publishProject(
             ['title', project.title],
             ['t', project.category.toLowerCase()],
             ['t', project.stage.toLowerCase()],
-            ['t', 'bies'], // tag all BIES projects
+            ['t', 'nostrbook'], // tag all nostrbook projects
             ['summary', project.description.substring(0, 200)],
             ...(project.thumbnail ? [['image', project.thumbnail]] : []),
         ],
@@ -151,7 +151,7 @@ export async function publishProjectListing(
         ['summary', project.description.substring(0, 200)],
         ['t', project.category.toLowerCase()],
         ['t', project.stage.toLowerCase()],
-        ['t', 'bies'],
+        ['t', 'nostrbook'],
         ['t', 'investment'],
     ];
 
@@ -177,7 +177,7 @@ export async function publishProjectListing(
 
 /**
  * Publish a NIP-65 relay list metadata event (Kind 10002).
- * Tags BIES relay as write, public relays as read.
+ * Tags community relay as write, public relays as read.
  */
 export async function publishRelayList(userId: string): Promise<string | null> {
     const tags: string[][] = [
@@ -200,7 +200,7 @@ export async function publishRelayList(userId: string): Promise<string | null> {
 }
 
 /**
- * Publish a Kind 1 announcement note to the BIES relay on behalf of a user.
+ * Publish a Kind 1 announcement note to the community relay on behalf of a user.
  * Used for system events: new user joined, project created, lightning address added.
  * Only works for custodial-key users; Nostr-native users handle this client-side.
  */
@@ -212,7 +212,7 @@ export async function publishAnnouncement(
     const event: EventTemplate = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [['t', 'bies'], ...tags],
+        tags: [['t', 'nostrbook'], ...tags],
         content,
     };
 
@@ -221,7 +221,7 @@ export async function publishAnnouncement(
 
 /**
  * Publish a NIP-52 time-based calendar event (Kind 31923).
- * Allows publishing to BIES relay only, public relays only, or both.
+ * Allows publishing to community relay only, public relays only, or both.
  */
 export async function publishCalendarEvent(
     userId: string,
@@ -241,7 +241,7 @@ export async function publishCalendarEvent(
         thumbnail?: string;
         ticketUrl?: string;
     },
-    target: 'bies' | 'public' | 'both' = 'bies'
+    target: 'community' | 'public' | 'both' = 'community'
 ): Promise<string | null> {
     try {
         const user = await prisma.user.findUnique({
@@ -291,7 +291,7 @@ export async function publishCalendarEvent(
         }
 
         // Hashtags
-        nip52Tags.push(['t', 'bies']);
+        nip52Tags.push(['t', 'nostrbook']);
         if (event.category) {
             nip52Tags.push(['t', event.category.toLowerCase().replace(/_/g, '-')]);
         }
@@ -315,7 +315,7 @@ export async function publishCalendarEvent(
 
         // Determine which relays to publish to
         const relays: string[] = [];
-        if ((target === 'bies' || target === 'both') && config.nostrPrivateRelay) {
+        if ((target === 'community' || target === 'both') && config.nostrPrivateRelay) {
             relays.push(config.nostrPrivateRelay);
         }
         if (target === 'public' || target === 'both') {
@@ -345,7 +345,7 @@ export async function deleteCalendarEvent(
     userId: string,
     nostrEventId: string,
     dTag: string,
-    target: 'bies' | 'public' | 'both' = 'bies'
+    target: 'community' | 'public' | 'both' = 'community'
 ): Promise<boolean> {
     try {
         const user = await prisma.user.findUnique({
@@ -368,7 +368,7 @@ export async function deleteCalendarEvent(
                 ['e', nostrEventId],
                 ['a', `31923:${user.nostrPubkey}:${dTag}`],
             ],
-            content: 'Event deleted from BIES',
+            content: 'Event deleted',
         };
 
         const { finalizeEvent } = await import('nostr-tools/pure');
@@ -376,7 +376,7 @@ export async function deleteCalendarEvent(
 
         const pool = await getPool();
         const relays: string[] = [];
-        if ((target === 'bies' || target === 'both') && config.nostrPrivateRelay) {
+        if ((target === 'community' || target === 'both') && config.nostrPrivateRelay) {
             relays.push(config.nostrPrivateRelay);
         }
         if (target === 'public' || target === 'both') {
@@ -407,7 +407,7 @@ export async function publishRSVPEvent(
         hostPubkey: string;
         status: 'accepted' | 'declined' | 'tentative';
     },
-    target: 'bies' | 'public' | 'both' = 'bies'
+    target: 'community' | 'public' | 'both' = 'community'
 ): Promise<string | null> {
     try {
         const user = await prisma.user.findUnique({
@@ -442,7 +442,7 @@ export async function publishRSVPEvent(
 
         const pool = await getPool();
         const relays: string[] = [];
-        if ((target === 'bies' || target === 'both') && config.nostrPrivateRelay) {
+        if ((target === 'community' || target === 'both') && config.nostrPrivateRelay) {
             relays.push(config.nostrPrivateRelay);
         }
         if (target === 'public' || target === 'both') {

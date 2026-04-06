@@ -15,7 +15,7 @@
 import { encrypt as nip49Encrypt, decrypt as nip49Decrypt } from 'nostr-tools/nip49';
 import { nip19, getPublicKey } from 'nostr-tools';
 
-const APP_CLIENT = 'BIES v1.0';
+const APP_CLIENT = 'Nostrbook v1.0';
 
 export const keyfileService = {
     /**

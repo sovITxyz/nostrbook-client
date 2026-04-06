@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { Loader2, Send, Globe, Lock, Zap, TrendingUp, Flame, Clock, Calendar, X, ImagePlus, Smile, RefreshCw, Heart, ChevronDown } from 'lucide-react';
-import { nostrService, BIES_RELAY, profileCache } from '../services/nostrService';
+import { nostrService, COMMUNITY_RELAY, profileCache } from '../services/nostrService';
 import { primalService, EXPLORE_VIEWS } from '../services/primalService';
 import { nostrSigner } from '../services/nostrSigner';
 import { blossomService } from '../services/blossomService';
@@ -68,7 +68,7 @@ const Feed = () => {
     useEffect(() => {
         const onVisible = () => {
             if (document.visibilityState === 'visible' && feedMode === 'private') {
-                nostrService.pool.close([BIES_RELAY]);
+                nostrService.pool.close([COMMUNITY_RELAY]);
                 setRefreshKey(k => k + 1);
             }
         };
@@ -225,7 +225,7 @@ const Feed = () => {
             toFetch.forEach(pk => fetchedProfiles.current.add(pk));
             liveQueue.clear();
             if (toFetch.length === 0) return;
-            const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+            const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
             if (profileMap.size > 0) {
                 setProfiles(prev => {
                     const next = { ...prev };
@@ -250,7 +250,7 @@ const Feed = () => {
             timeout = setTimeout(() => setLoading(false), 15000);
 
             sub = nostrService.pool.subscribeMany(
-                [BIES_RELAY],
+                [COMMUNITY_RELAY],
                 { kinds: [1, 6], limit: 50 },
                 {
                     onevent: (event) => {
@@ -344,8 +344,8 @@ const Feed = () => {
                             });
                         }
 
-                        // Fetch from BIES relay only (local, fast)
-                        const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+                        // Fetch from community relay only (local, fast)
+                        const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
                         if (profileMap.size > 0) {
                             setProfiles(prev => {
                                 const next = { ...prev };
@@ -405,7 +405,7 @@ const Feed = () => {
         const userReposted = new Set();
 
         const sub = nostrService.pool.subscribeMany(
-            [BIES_RELAY, ...nostrService.relays],
+            [COMMUNITY_RELAY, ...nostrService.relays],
             { kinds: [7, 6, 1], '#e': postIds, limit: 2000 },
             {
                 onevent: (event) => {
@@ -559,7 +559,7 @@ const Feed = () => {
         if (loading || refreshing) return;
         setRefreshing(true);
         if (feedMode === 'private') {
-            nostrService.pool.close([BIES_RELAY]);
+            nostrService.pool.close([COMMUNITY_RELAY]);
         }
         setRefreshKey(k => k + 1);
         setTimeout(() => setRefreshing(false), 1500);
@@ -613,7 +613,7 @@ const Feed = () => {
 
         try {
             let content = composeText.trim();
-            const tags = [['t', 'bies']];
+            const tags = [['t', 'nostrbook']];
 
             if (attachedFiles.length > 0) {
                 setUploading(true);
@@ -643,7 +643,7 @@ const Feed = () => {
             if (broadcastPublic) {
                 await Promise.any(nostrService.pool.publish(nostrService.relays, signedEvent));
             } else {
-                await Promise.any(nostrService.pool.publish([BIES_RELAY], signedEvent));
+                await Promise.any(nostrService.pool.publish([COMMUNITY_RELAY], signedEvent));
             }
 
             // Optimistically add to feed so the user sees it immediately
@@ -739,7 +739,7 @@ const Feed = () => {
                 content: '+',
             };
             if (feedMode === 'private') {
-                await nostrService.publishToBiesRelay(event);
+                await nostrService.publishToCommunityRelay(event);
             } else {
                 await nostrService.publishEvent(event);
             }
@@ -779,7 +779,7 @@ const Feed = () => {
                 content: JSON.stringify(post),
             };
             if (relay === 'private') {
-                await nostrService.publishToBiesRelay(event);
+                await nostrService.publishToCommunityRelay(event);
             } else {
                 await nostrService.publishEvent(event);
             }
@@ -812,7 +812,7 @@ const Feed = () => {
             };
             const signed = await nostrSigner.signEvent(unsigned);
             if (feedMode === 'private') {
-                await nostrService.publishToBiesRelay(signed);
+                await nostrService.publishToCommunityRelay(signed);
             } else {
                 await Promise.any(nostrService.pool.publish(nostrService.relays, signed));
             }
@@ -941,7 +941,7 @@ const Feed = () => {
             };
             // Publish delete request to both private and public relays
             await nostrService.publishEvent(event);
-            try { await nostrService.publishToBiesRelay(event); } catch { /* best-effort */ }
+            try { await nostrService.publishToCommunityRelay(event); } catch { /* best-effort */ }
             // Remove from local feed
             setPosts(prev => prev.filter(p => p.id !== post.id));
         } catch (err) {
@@ -980,7 +980,7 @@ const Feed = () => {
                 content: '',
             };
             await nostrService.publishEvent(event);
-            try { await nostrService.publishToBiesRelay(event); } catch { /* best-effort */ }
+            try { await nostrService.publishToCommunityRelay(event); } catch { /* best-effort */ }
         } catch (err) {
             console.error('[Feed] Report failed:', err);
         }
@@ -1084,11 +1084,11 @@ const Feed = () => {
         fetchedComments.current.add(postId);
         setLoadingComments(prev => ({ ...prev, [postId]: true }));
 
-        // For private relay feed, subscribe directly to BIES relay for replies
+        // For private relay feed, subscribe directly to community relay for replies
         if (feedMode === 'private') {
             const commentPubkeys = [];
             const sub = nostrService.pool.subscribeMany(
-                [BIES_RELAY],
+                [COMMUNITY_RELAY],
                 { kinds: [1], '#e': [postId], limit: 100 },
                 {
                     onevent: (event) => {
@@ -1107,7 +1107,7 @@ const Feed = () => {
                         const toFetch = [...new Set(commentPubkeys)].filter(pk => !fetchedProfiles.current.has(pk));
                         toFetch.forEach(pk => fetchedProfiles.current.add(pk));
                         if (toFetch.length === 0) return;
-                        const profileMap = await nostrService.getProfiles(toFetch, [BIES_RELAY]);
+                        const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
                         if (profileMap.size > 0) {
                             setProfiles(prev => {
                                 const next = { ...prev };
@@ -1230,7 +1230,7 @@ const Feed = () => {
                 <div className="primal-feed-header">
                     <div className="primal-feed-title">
                         <NostrIcon size={22} />
-                        <span>{t('feed.biesFeed', 'BIES Feed')}</span>
+                        <span>{t('feed.biesFeed', 'Community Feed')}</span>
                     </div>
                     <div className="primal-feed-tabs">
                         <button

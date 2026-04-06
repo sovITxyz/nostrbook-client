@@ -4,7 +4,7 @@ import { nostrSigner } from './nostrSigner.js';
 
 // ─── Persistent profile cache (localStorage) ────────────────────────────────
 
-const PROFILE_CACHE_KEY = 'bies_nostr_profiles';
+const PROFILE_CACHE_KEY = 'nb_nostr_profiles';
 const PROFILE_CACHE_TTL = 3600 * 1000; // 1 hour
 const PROFILE_CACHE_VERSION = 1;
 
@@ -45,10 +45,10 @@ export const profileCache = {
     },
 };
 
-// Private BIES relay (set via env or falls back to relative WebSocket URL)
+// Private community relay (set via env or falls back to relative WebSocket URL)
 // Use import.meta.env.BASE_URL (from vite.config base) so the path works
 // both in dev (/relay) and production.
-export const BIES_RELAY = import.meta.env.VITE_NOSTR_RELAY || (
+export const COMMUNITY_RELAY = import.meta.env.VITE_NOSTR_RELAY || (
     typeof window !== 'undefined'
         ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${import.meta.env.BASE_URL || '/'}relay`
         : 'ws://localhost:7777'
@@ -64,14 +64,14 @@ export const PUBLIC_RELAYS = [
 ];
 
 // Relays used for NIP-17 DMs — only public relays because gift-wraps are
-// signed by throwaway keys that aren't on the BIES relay whitelist.
+// signed by throwaway keys that aren't on the community relay whitelist.
 export const DM_RELAYS = [...PUBLIC_RELAYS];
 
-// All relays (BIES relay first for priority)
-export const NOSTR_RELAYS = [BIES_RELAY, ...PUBLIC_RELAYS];
+// All relays (community relay first for priority)
+export const NOSTR_RELAYS = [COMMUNITY_RELAY, ...PUBLIC_RELAYS];
 
 /**
- * NIP-42 auth handler — signs the AUTH challenge event so the BIES
+ * NIP-42 auth handler — signs the AUTH challenge event so the community
  * private relay allows read/write access.  Uses the unified signer
  * (in-memory key or browser extension, depending on login method).
  */
@@ -88,20 +88,20 @@ class NostrService {
     constructor() {
         this.pool = new SimplePool();
         this.relays = NOSTR_RELAYS;
-        this.biesRelay = BIES_RELAY;
+        this.communityRelay = COMMUNITY_RELAY;
         this.publicRelays = PUBLIC_RELAYS;
         this.dmRelays = DM_RELAYS;
 
-        // Enable NIP-42 automatic auth for the BIES private relay.
+        // Enable NIP-42 automatic auth for the community private relay.
         // When the relay (or auth proxy) sends an AUTH challenge on connect,
         // the pool will sign and respond automatically using the user's key.
         this.pool.automaticallyAuth = (relayUrl) => {
-            // Only auto-auth for the BIES relay, not public relays
+            // Only auto-auth for the community relay, not public relays
             const normalized = relayUrl.replace(/\/+$/, '');
-            const biesNorm = this.biesRelay.replace(/\/+$/, '');
-            if (normalized === biesNorm) {
+            const communityNorm = this.communityRelay.replace(/\/+$/, '');
+            if (normalized === communityNorm) {
                 return async (evt) => {
-                    console.log('[Nostr] AUTH challenge received for BIES relay, signing...');
+                    console.log('[Nostr] AUTH challenge received for community relay, signing...');
                     try {
                         const signed = await nostrSigner.signEvent(evt);
                         console.log('[Nostr] AUTH event signed successfully');
@@ -164,7 +164,7 @@ class NostrService {
      * Returns a Map of pubkey → merged profile object.
      *
      * @param {string[]} pubkeys - hex pubkeys
-     * @param {string[]} [relays] - specific relays to query (default: BIES + public)
+     * @param {string[]} [relays] - specific relays to query (default: community + public)
      */
     async getProfiles(pubkeys, relays) {
         const unique = [...new Set(pubkeys)].filter(Boolean);
@@ -178,7 +178,7 @@ class NostrService {
         // Phase 2: fetch missing from relays
         try {
             const result = new Map(cached);
-            const targetRelays = relays || [this.biesRelay, ...this.publicRelays];
+            const targetRelays = relays || [this.communityRelay, ...this.publicRelays];
             const events = await this.pool.querySync(targetRelays, { kinds: [0], authors: missing });
             const fetched = this._mergeProfileEvents(events);
             for (const [pk, p] of fetched) result.set(pk, p);
@@ -218,7 +218,7 @@ class NostrService {
     }
 
     // Fetch user profile (Kind 0 — NIP-01 + NIP-24 extra metadata fields)
-    // Queries BIES relay + public relays and picks the most recent Kind 0 event,
+    // Queries community relay + public relays and picks the most recent Kind 0 event,
     // then merges any missing fields from older events so we get the
     // most complete profile (banner, picture, etc.).
     async getProfile(pubkey) {
@@ -228,7 +228,7 @@ class NostrService {
 
         try {
             const filter = { kinds: [0], authors: [pubkey] };
-            const allRelays = [this.biesRelay, ...this.publicRelays];
+            const allRelays = [this.communityRelay, ...this.publicRelays];
             const events = await this.pool.querySync(allRelays, filter);
 
             if (!events || events.length === 0) return null;
@@ -302,7 +302,7 @@ class NostrService {
 
         const senderGiftWrap = this._createGiftWrap(sealForSender, senderPubkey, now);
 
-        // Publish gift-wraps to DM relays only (not BIES relay — throwaway
+        // Publish gift-wraps to DM relays only (not community relay — throwaway
         // keys aren't on the whitelist so the private relay would reject them).
         const results = await Promise.allSettled([
             ...this.pool.publish(this.dmRelays, recipientGiftWrap),
@@ -350,7 +350,7 @@ class NostrService {
      */
     subscribeToNip17DMs(myPubkey, callback) {
         // Subscribe on DM relays — gift-wraps live on public relays, not the
-        // BIES relay (throwaway keys aren't whitelisted there).
+        // community relay (throwaway keys aren't whitelisted there).
         //
         // Pass a single filter object (not wrapped in an array) — SimplePool
         // in nostr-tools v2 double-nests arrays, producing invalid REQ
@@ -428,18 +428,18 @@ class NostrService {
     }
 
     /**
-     * Publish a signed event to the private BIES relay only.
+     * Publish a signed event to the private community relay only.
      */
-    async publishToBiesRelay(event) {
+    async publishToCommunityRelay(event) {
         const signedEvent = await nostrSigner.signEvent(event);
-        console.log('[Nostr] Publishing to BIES relay:', this.biesRelay);
+        console.log('[Nostr] Publishing to community relay:', this.communityRelay);
         try {
-            return await Promise.any(this.pool.publish([this.biesRelay], signedEvent, { onauth: handleRelayAuth }));
+            return await Promise.any(this.pool.publish([this.communityRelay], signedEvent, { onauth: handleRelayAuth }));
         } catch (err) {
             // Promise.any wraps rejections in AggregateError — unwrap for clarity
             if (err?.errors?.length) {
                 const inner = err.errors[0];
-                console.error('[Nostr] BIES relay publish rejected:', inner?.message || inner);
+                console.error('[Nostr] community relay publish rejected:', inner?.message || inner);
                 throw typeof inner === 'string' ? new Error(inner) : inner;
             }
             throw err;
@@ -477,9 +477,9 @@ class NostrService {
 
     /**
      * Update the user's Nostr profile (kind:0 metadata).
-     * Same as updateProfile but publishes only to the private BIES relay.
+     * Same as updateProfile but publishes only to the private community relay.
      */
-    async updateProfileToBiesRelay(profileData) {
+    async updateProfileToCommunityRelay(profileData) {
         const pubkey = await nostrSigner.getPublicKey();
 
         const existing = await this.getProfile(pubkey);
@@ -497,7 +497,7 @@ class NostrService {
             content: JSON.stringify(merged),
         };
 
-        return this.publishToBiesRelay(event);
+        return this.publishToCommunityRelay(event);
     }
 
     /**
@@ -577,10 +577,10 @@ class NostrService {
     /**
      * Publish a NIP-52 time-based calendar event (kind:31923).
      * For Nostr-native users — signs via browser extension.
-     * @param {Object} eventData - Event details from the BIES event form
-     * @param {'bies'|'public'|'both'} target - Which relays to publish to
+     * @param {Object} eventData - Event details from the community event form
+     * @param {'community'|'public'|'both'} target - Which relays to publish to
      */
-    async publishCalendarEvent(eventData, target = 'bies') {
+    async publishCalendarEvent(eventData, target = 'community') {
         // Validate required NIP-52 fields
         if (!eventData.id) throw new Error('Event ID (d-tag) is required for NIP-52');
         if (!eventData.title?.trim()) throw new Error('Event title is required for NIP-52');
@@ -616,7 +616,7 @@ class NostrService {
             tags.push(['r', eventData.ticketUrl]);
         }
 
-        tags.push(['t', 'bies']);
+        tags.push(['t', 'nostrbook']);
         if (eventData.category) {
             tags.push(['t', eventData.category.toLowerCase().replace(/_/g, '-')]);
         }
@@ -636,12 +636,12 @@ class NostrService {
 
         // Determine relays based on target
         let relays;
-        if (target === 'bies') {
-            relays = [this.biesRelay];
+        if (target === 'community') {
+            relays = [this.communityRelay];
         } else if (target === 'public') {
             relays = [...this.publicRelays];
         } else {
-            relays = [this.biesRelay, ...this.publicRelays];
+            relays = [this.communityRelay, ...this.publicRelays];
         }
 
         const signedEvent = await nostrSigner.signEvent(event);
@@ -673,7 +673,7 @@ class NostrService {
             limit: options.limit || 50,
         };
 
-        const relays = [this.biesRelay, ...this.publicRelays];
+        const relays = [this.communityRelay, ...this.publicRelays];
 
         const sub = this.pool.subscribeMany(
             relays,
@@ -691,9 +691,9 @@ class NostrService {
      * Publish a NIP-09 deletion event (kind:5) to remove a calendar event.
      * @param {string} nostrEventId - The Nostr event ID to delete
      * @param {string} dTag - The d-tag of the calendar event
-     * @param {'bies'|'public'|'both'} target - Which relays to delete from
+     * @param {'community'|'public'|'both'} target - Which relays to delete from
      */
-    async deleteCalendarEvent(nostrEventId, dTag, target = 'bies') {
+    async deleteCalendarEvent(nostrEventId, dTag, target = 'community') {
         const pubkey = await nostrSigner.getPublicKey();
 
         const event = {
@@ -704,13 +704,13 @@ class NostrService {
                 ['e', nostrEventId],
                 ['a', `31923:${pubkey}:${dTag}`],
             ],
-            content: 'Event deleted from BIES',
+            content: 'Event deleted from community',
         };
 
         let relays;
-        if (target === 'bies') relays = [this.biesRelay];
+        if (target === 'community') relays = [this.communityRelay];
         else if (target === 'public') relays = [...this.publicRelays];
-        else relays = [this.biesRelay, ...this.publicRelays];
+        else relays = [this.communityRelay, ...this.publicRelays];
 
         const signedEvent = await nostrSigner.signEvent(event);
         const results = await Promise.allSettled(
@@ -724,9 +724,9 @@ class NostrService {
     /**
      * Publish a NIP-52 calendar event RSVP (kind:31925).
      * @param {Object} rsvpData - { eventDTag, hostPubkey, status }
-     * @param {'bies'|'public'|'both'} target
+     * @param {'community'|'public'|'both'} target
      */
-    async publishRSVPEvent(rsvpData, target = 'bies') {
+    async publishRSVPEvent(rsvpData, target = 'community') {
         const pubkey = await nostrSigner.getPublicKey();
 
         const tags = [
@@ -746,9 +746,9 @@ class NostrService {
         };
 
         let relays;
-        if (target === 'bies') relays = [this.biesRelay];
+        if (target === 'community') relays = [this.communityRelay];
         else if (target === 'public') relays = [...this.publicRelays];
-        else relays = [this.biesRelay, ...this.publicRelays];
+        else relays = [this.communityRelay, ...this.publicRelays];
 
         const signedEvent = await nostrSigner.signEvent(event);
         const results = await Promise.allSettled(
@@ -770,7 +770,7 @@ class NostrService {
         if (this._relayHealthCache && Date.now() - this._relayHealthCacheTime < 30000) {
             return this._relayHealthCache;
         }
-        const relays = [this.biesRelay, ...this.publicRelays];
+        const relays = [this.communityRelay, ...this.publicRelays];
         const results = await Promise.allSettled(
             relays.map(async (url) => {
                 const ws = new WebSocket(url);
@@ -802,7 +802,7 @@ class NostrService {
             ['summary', (project.description || '').substring(0, 200)],
             ['t', (project.category || 'other').toLowerCase()],
             ['t', (project.stage || 'idea').toLowerCase()],
-            ['t', 'bies'],
+            ['t', 'nostrbook'],
             ['t', 'investment'],
         ];
 
@@ -830,12 +830,12 @@ class NostrService {
     /**
      * Publish a NIP-65 relay list metadata event (kind:10002).
      * For Nostr-native users — signs via browser extension.
-     * Tags BIES relay as write, public relays as read.
+     * Tags community relay as write, public relays as read.
      */
     async publishRelayList() {
         const pubkey = await nostrSigner.getPublicKey();
         const tags = [
-            ['r', this.biesRelay, 'write'],
+            ['r', this.communityRelay, 'write'],
             ...this.publicRelays.map(relay => ['r', relay, 'read']),
         ];
 

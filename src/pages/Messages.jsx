@@ -105,7 +105,7 @@ const Messages = () => {
                                 pubkey: p.user.nostrPubkey,
                                 name: p.name || '',
                                 avatar: p.avatar || '',
-                                source: 'BIES',
+                                source: 'nostrbook',
                             });
                         }
                     }

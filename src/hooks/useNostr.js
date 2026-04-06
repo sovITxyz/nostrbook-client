@@ -26,7 +26,7 @@ export const useNostrFeed = (npubs, relayMode = 'combined') => {
         fetchedProfiles.current.clear();
 
         const relays =
-            relayMode === 'private'  ? [nostrService.biesRelay] :
+            relayMode === 'private'  ? [nostrService.communityRelay] :
             relayMode === 'public'   ? nostrService.publicRelays :
             nostrService.relays; // combined
 
@@ -75,7 +75,7 @@ export const useNostrFeed = (npubs, relayMode = 'combined') => {
                 return;
             }
 
-            // Ensure signer is ready when hitting the BIES relay (NIP-42)
+            // Ensure signer is ready when hitting the community relay (NIP-42)
             if (relayMode !== 'public') {
                 try { await nostrSigner.tryRestore(); } catch { /* ok — public relays still work */ }
             }

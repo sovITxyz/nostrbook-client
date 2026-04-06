@@ -25,7 +25,7 @@ let trackedPubkeys: Set<string> = new Set();
 
 /**
  * Start the zap receipt indexer. Called once on server startup.
- * Subscribes to kind:9735 events where #p matches any BIES user pubkey.
+ * Subscribes to kind:9735 events where #p matches any platform user pubkey.
  */
 export async function startZapIndexer(): Promise<void> {
     try {
@@ -196,7 +196,7 @@ async function processZapReceipt(event: Event): Promise<void> {
         });
     }
 
-    // Notify the recipient if they are a BIES user
+    // Notify the recipient if they are a registered user
     const recipientUser = await prisma.user.findUnique({
         where: { nostrPubkey: recipientPubkey },
         select: { id: true },

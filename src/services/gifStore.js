@@ -33,7 +33,7 @@ class GifStore {
             };
 
             const events = await nostrService.pool.querySync(
-                [nostrService.biesRelay, ...nostrService.publicRelays],
+                [nostrService.communityRelay, ...nostrService.publicRelays],
                 filter
             );
 

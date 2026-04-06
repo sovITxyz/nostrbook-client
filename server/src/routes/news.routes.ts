@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validate';
-import { getNewsStories, getBiesUpdates } from '../controllers/news.controller';
+import { getNewsStories, getPlatformUpdates } from '../controllers/news.controller';
 import {
     getSiteSettings,
     updateSiteSettings,
@@ -14,7 +14,7 @@ const router = Router();
 
 // Existing news endpoints
 router.get('/stories', getNewsStories);
-router.get('/bies-updates', getBiesUpdates);
+router.get('/platform-updates', getPlatformUpdates);
 
 // Site settings (public read, admin write)
 router.get('/settings', getSiteSettings);

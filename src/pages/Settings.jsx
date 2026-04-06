@@ -607,7 +607,7 @@ const Settings = () => {
             )}
 
             <div className="version-footer">
-                BIES v{__APP_VERSION__}
+                Nostrbook v{__APP_VERSION__}
             </div>
 
             <style jsx>{`

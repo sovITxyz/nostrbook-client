@@ -1,14 +1,14 @@
 {
-  "name": "BIES - Build in El Salvador",
-  "short_name": "BIES",
-  "description": "Bitcoin-native investment ecosystem connecting builders and investors in El Salvador",
+  "name": "Nostrbook",
+  "short_name": "Nostrbook",
+  "description": "Community platform powered by Nostr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0047ab",
   "theme_color": "#0047ab",
-  "categories": ["business", "finance"],
+  "categories": ["social"],
   "icons": [
     {
       "src": "/icons/icon-192.png",

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { UserModeProvider, useUserMode } from './context/UserModeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ViewProvider, useViewPreference } from './context/ViewContext';
@@ -9,15 +8,11 @@ import { preferencesApi } from './services/api';
 import i18n from './i18n';
 import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
-import ModeSelectionModal from './components/ModeSelectionModal';
 
 // Pages
-import Landing from './pages/Landing';
 import Feed from './pages/Feed';
 import Discover from './pages/Discover';
 import Members from './pages/Members';
-import Builders from './pages/Builders';
-import Investors from './pages/Investors';
 import Media from './pages/Media';
 import News from './pages/News';
 import Events from './pages/Events';
@@ -25,7 +20,6 @@ import EventDetail from './pages/EventDetail';
 import CreateEvent from './pages/CreateEvent';
 import EditEvent from './pages/EditEvent';
 import MyEvents from './pages/MyEvents';
-import Team from './pages/Team';
 import PublicProfile from './pages/PublicProfile';
 import Profile from './pages/Profile';
 import ProfileEdit from './pages/ProfileEdit';
@@ -56,7 +50,6 @@ import AdminEvents from './pages/admin/AdminEvents';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import AdminNewsSettings from './pages/admin/AdminNewsSettings';
-import AdminInvestorVetting from './pages/admin/AdminInvestorVetting';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -106,10 +99,10 @@ const AppContent = () => {
         preferencesApi.get().then(prefs => {
             if (prefs.theme) setTheme(prefs.theme);
             if (prefs.language) i18n.changeLanguage(prefs.language);
-            if (prefs.projectsView) { localStorage.setItem('bies_projects_view', prefs.projectsView); setDefaultView(prefs.projectsView); }
-            if (prefs.membersView) localStorage.setItem('bies_members_view', prefs.membersView);
-            if (prefs.eventsView) localStorage.setItem('bies_events_view', prefs.eventsView);
-            if (prefs.mediaView) localStorage.setItem('bies_media_view', prefs.mediaView);
+            if (prefs.projectsView) { localStorage.setItem('nb_projects_view', prefs.projectsView); setDefaultView(prefs.projectsView); }
+            if (prefs.membersView) localStorage.setItem('nb_members_view', prefs.membersView);
+            if (prefs.eventsView) localStorage.setItem('nb_events_view', prefs.eventsView);
+            if (prefs.mediaView) localStorage.setItem('nb_media_view', prefs.mediaView);
         }).catch(() => {});
     }, [user]);
 
@@ -143,15 +136,10 @@ const AppContent = () => {
                         <ProtectedRoute><EditEvent /></ProtectedRoute>
                     } />
                     <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
-                    <Route path="/members" element={<Navigate to="/discover" replace />} />
-                    <Route path="/builders" element={<Navigate to="/discover" replace />} />
-                    <Route path="/builder/:id" element={<ProtectedRoute><PublicProfile type="builder" /></ProtectedRoute>} />
-                    <Route path="/investors" element={<Navigate to="/discover" replace />} />
-                    <Route path="/investor/:id" element={<ProtectedRoute><PublicProfile type="investor" /></ProtectedRoute>} />
+                    <Route path="/members" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                     <Route path="/media" element={<ProtectedRoute><Media /></ProtectedRoute>} />
                     <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
                     <Route path="/news/:slug" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
-                    <Route path="/about" element={<ProtectedRoute><Team /></ProtectedRoute>} />
 
                     {/* Protected Routes */}
                     {/* Specific Dashboard Routes */}
@@ -185,7 +173,6 @@ const AppContent = () => {
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
                         <Route path="news-settings" element={<AdminNewsSettings />} />
-                        <Route path="investor-vetting" element={<AdminInvestorVetting />} />
                     </Route>
 
                     <Route path="/project/:id" element={
@@ -241,13 +228,11 @@ function App() {
         <AuthProvider>
             <ThemeProvider>
                 <ViewProvider>
-                    <UserModeProvider>
-                        <LightboxProvider>
-                            <Router basename="/" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                                <AppContent />
-                            </Router>
-                        </LightboxProvider>
-                    </UserModeProvider>
+                    <LightboxProvider>
+                        <Router basename="/" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                            <AppContent />
+                        </Router>
+                    </LightboxProvider>
                 </ViewProvider>
             </ThemeProvider>
         </AuthProvider>

@@ -81,7 +81,7 @@ const ProfileSetup = () => {
         setError('');
 
         try {
-            // Save BIES profile
+            // Save profile
             const updateData = { name: biesName.trim() };
             if (nip05Name.trim()) updateData.nip05Name = nip05Name.trim().toLowerCase();
             if (user?.nostrPubkey) updateData.nostrNpub = nip19.npubEncode(user.nostrPubkey);
@@ -92,7 +92,7 @@ const ProfileSetup = () => {
 
             await profilesApi.update(updateData);
 
-            // Publish Nostr kind:0 — always sync to private BIES relay;
+            // Publish Nostr kind:0 — always sync to community relay;
             // if user edited the Nostr section, also broadcast to public relays
             try {
                 const data = {};
@@ -100,13 +100,13 @@ const ProfileSetup = () => {
                 if (nostrForm.about) data.about = nostrForm.about;
                 if (nostrForm.picture || nostrProfile?.picture) data.picture = nostrForm.picture || nostrProfile?.picture;
                 if (nostrForm.website || nostrProfile?.website) data.website = nostrForm.website || nostrProfile?.website;
-                if (nip05Name.trim()) data.nip05 = `${nip05Name.trim().toLowerCase()}@bies.sovit.xyz`;
+                if (nip05Name.trim()) data.nip05 = `${nip05Name.trim().toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`;
                 else if (nostrForm.nip05) data.nip05 = nostrForm.nip05;
                 if (nostrForm.lud16) data.lud16 = nostrForm.lud16;
                 if (showNostrEdit && nostrForm.name) {
                     await nostrService.updateProfile(data);
                 } else {
-                    await nostrService.updateProfileToBiesRelay(data);
+                    await nostrService.updateProfileToCommunityRelay(data);
                 }
             } catch (nostrErr) {
                 console.error('Nostr profile sync failed (non-blocking):', nostrErr);
@@ -117,11 +117,11 @@ const ProfileSetup = () => {
                 const announceEvent = {
                     kind: 1,
                     created_at: Math.floor(Date.now() / 1000),
-                    tags: [['t', 'bies'], ['t', 'new-user'], ['t', 'introductions'], ['t', 'buildinelsalvador']],
-                    content: `${biesName.trim()} just joined the Builder Hub! Welcome to the Highest Signal Builder Ecosystem of El Salvador. #introductions #buildinelsalvador`,
+                    tags: [['t', 'nostrbook'], ['t', 'new-user'], ['t', 'introductions']],
+                    content: `${biesName.trim()} just joined the community! Welcome to Nostrbook. #introductions`,
                 };
                 await Promise.allSettled([
-                    nostrService.publishToBiesRelay(announceEvent),
+                    nostrService.publishToCommunityRelay(announceEvent),
                     nostrService.publishEvent(announceEvent),
                 ]);
             } catch (announceErr) {
@@ -221,13 +221,13 @@ const ProfileSetup = () => {
                                     style={{ opacity: 0.7, cursor: 'default' }}
                                 />
                                 <p className="text-xs text-gray-400 mt-1">
-                                    You can set a BIES identity later in profile settings.
+                                    You can set an identity later in profile settings.
                                 </p>
                             </div>
                         ) : (
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Choose your BIES identity
+                                    Choose your identity
                                 </label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                                     <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -247,7 +247,7 @@ const ProfileSetup = () => {
                                 </div>
                                 {nip05Name && (
                                     <p className="text-xs mt-1" style={{ color: nip05Available === false ? '#ef4444' : 'var(--color-gray-400)' }}>
-                                        {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@bies.sovit.xyz`}
+                                        {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`}
                                     </p>
                                 )}
                             </div>

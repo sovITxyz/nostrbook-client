@@ -1,5 +1,5 @@
 /**
- * BIES API Client
+ * Nostrbook API Client
  *
  * Centralised HTTP client for all backend communication.
  *
@@ -245,7 +245,7 @@ export const notificationsApi = {
     delete: (id) => del(`/notifications/${id}`),
 
     /**
-     * Notify a BIES user about a feed interaction (comment, like, reply).
+     * Notify a user about a feed interaction (comment, like, reply).
      * Fire-and-forget — errors are silently ignored.
      */
     feedInteraction: (data) => post('/notifications/feed-interaction', data).catch(() => {}),

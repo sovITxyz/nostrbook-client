@@ -55,7 +55,7 @@ const ProfileEdit = () => {
     const [hasExistingProfile, setHasExistingProfile] = useState(false);
     // memberRole removed — roles are now earned through proof of work
 
-    // BIES profile form
+    // Profile form
     const [form, setForm] = useState({
         name: '',
         bio: '',
@@ -107,7 +107,7 @@ const ProfileEdit = () => {
         }
     }, [user?.nostrPubkey]);
 
-    // Auto-apply Nostr profile fields to BIES form when BIES profile is missing them
+    // Auto-apply Nostr profile fields to form when profile is missing them
     useEffect(() => {
         if (!nostrProfile) return;
         setForm(prev => {
@@ -306,7 +306,7 @@ const ProfileEdit = () => {
             Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
             await profilesApi.update(payload);
 
-            // Always sync kind:0 metadata to the private BIES relay;
+            // Always sync kind:0 metadata to the community relay;
             // optionally also broadcast to public relays
             try {
                 const nostrData = {};
@@ -318,11 +318,11 @@ const ProfileEdit = () => {
                 if (form.banner) nostrData.banner = form.banner;
                 if (form.website) nostrData.website = form.website;
                 if (form.lightningAddress) nostrData.lud16 = form.lightningAddress;
-                if (form.nip05Name) nostrData.nip05 = `${form.nip05Name.toLowerCase()}@bies.sovit.xyz`;
+                if (form.nip05Name) nostrData.nip05 = `${form.nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`;
                 if (publishPublic) {
                     await nostrService.updateProfile(nostrData);
                 } else {
-                    await nostrService.updateProfileToBiesRelay(nostrData);
+                    await nostrService.updateProfileToCommunityRelay(nostrData);
                 }
             } catch (nostrErr) {
                 console.error('Relay profile sync failed (non-blocking):', nostrErr);
@@ -668,9 +668,9 @@ const ProfileEdit = () => {
                             <input type="file" accept="image/*" onChange={handleBannerSelect} style={{ display: 'none' }} />
                         </label>
                         <div className="pe-banner-save-group">
-                            <button onClick={handleSave} type="button" disabled={saving} className="pe-save-btn pe-banner-save-bies">
+                            <button onClick={handleSave} type="button" disabled={saving} className="pe-save-btn pe-banner-save-community">
                                 {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
-                                {saving ? 'Saving...' : 'Save to BIES'}
+                                {saving ? 'Saving...' : 'Save'}
                             </button>
                             <button onClick={(e) => handleSave(e, { publishPublic: true })} type="button" disabled={saving} className="pe-save-btn pe-banner-save-nostr">
                                 {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <NostrIcon size={14} />}
@@ -879,7 +879,7 @@ const ProfileEdit = () => {
                             </div>
                             {form.nip05Name && (
                                 <p className="pe-hint" style={{ color: nip05Available === false ? '#ef4444' : undefined }}>
-                                    {nip05Available === false ? 'Taken' : `${form.nip05Name.toLowerCase()}@bies.sovit.xyz`}
+                                    {nip05Available === false ? 'Taken' : `${form.nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`}
                                 </p>
                             )}
                         </div>
@@ -1152,7 +1152,7 @@ const ProfileEdit = () => {
                 <div className="pe-bottom-save">
                     <button onClick={handleSave} type="button" disabled={saving} className="pe-save-btn pe-save-btn-full">
                         {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
-                        {saving ? 'Saving...' : 'Save to BIES'}
+                        {saving ? 'Saving...' : 'Save'}
                     </button>
                     <button onClick={(e) => handleSave(e, { publishPublic: true })} type="button" disabled={saving} className="pe-save-btn pe-save-btn-full pe-save-btn-nostr">
                         {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <NostrIcon size={16} />}
@@ -1376,7 +1376,7 @@ const ProfileEdit = () => {
                     display: flex;
                     gap: 0.35rem;
                 }
-                .pe-banner-save-bies {
+                .pe-banner-save-community {
                     box-shadow: 0 2px 6px rgba(0,0,0,0.25);
                 }
                 .pe-banner-save-nostr {

@@ -34,7 +34,7 @@ const News = () => {
             .finally(() => setTweetsLoading(false));
     }, []);
 
-    // Fetch live news from gnews.io + RSS (El Salvador)
+    // Fetch live news from gnews.io + RSS (community)
     useEffect(() => {
         setLiveNewsLoading(true);
         newsApi.liveFeed(newsKeyword)
@@ -65,7 +65,7 @@ const News = () => {
                     className={`feed-tab ${mobileTab === 'news' ? 'active' : ''}`}
                     onClick={() => setMobileTab('news')}
                 >
-                    El Salvador News
+                    Community News
                 </button>
                 <button
                     className={`feed-tab ${mobileTab === 'twitter' ? 'active' : ''}`}
@@ -77,10 +77,10 @@ const News = () => {
 
             <div className="grid news-layout">
 
-                {/* Left/Main Column: El Salvador News */}
+                {/* Left/Main Column: Community News */}
                 <main className={`news-col main-col ${mobileTab !== 'news' ? 'mobile-hidden' : ''}`}>
                     <div className="col-header page-header">
-                        <h3>El Salvador News</h3>
+                        <h3>Community News</h3>
                         {liveNews.length > 0 && <span className="live-badge">LIVE</span>}
                     </div>
                     <div style={{ marginBottom: '1rem' }}>
@@ -105,7 +105,7 @@ const News = () => {
                         </div>
                     ) : liveNews.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-gray-500)' }}>
-                            No El Salvador news found.
+                            No community news found.
                         </div>
                     ) : (
                         liveNews.slice(0, 15).map((article, i) => (

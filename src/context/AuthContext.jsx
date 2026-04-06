@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         if (!PASSKEY_ENABLED) return;
         if (!nostrSigner.hasKey || !nostrSigner.getNsec()) return;
         if (keytrService.hasCredential(nostrSigner.pubkey)) return;
-        if (sessionStorage.getItem('bies_passkey_prompt_dismissed')) return;
+        if (sessionStorage.getItem('nb_passkey_prompt_dismissed')) return;
 
         const supported = await keytrService.checkSupport();
         if (!supported) return;
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const dismissPasskeyPrompt = useCallback(() => {
-        sessionStorage.setItem('bies_passkey_prompt_dismissed', '1');
+        sessionStorage.setItem('nb_passkey_prompt_dismissed', '1');
         setShowPasskeyPrompt(false);
     }, []);
 
@@ -278,7 +278,7 @@ export const AuthProvider = ({ children }) => {
         // New users have a generated placeholder name like "nostr:abc12345"
         const isNew = result.user?.profile?.name?.startsWith('nostr:');
 
-        // Auto-seed BIES profile from Nostr Kind 0 for new users
+        // Auto-seed profile from Nostr Kind 0 for new users
         if (isNew && result.user?.nostrPubkey) {
             seedProfileFromNostr(result.user.nostrPubkey).catch(() => {});
         }
@@ -288,7 +288,7 @@ export const AuthProvider = ({ children }) => {
 
     /**
      * Fetch the user's Kind 0 profile from public Nostr relays
-     * and update the BIES profile with any available fields
+     * and update the platform profile with any available fields
      * (name, avatar, banner, bio, website).
      */
     const seedProfileFromNostr = async (pubkey) => {
@@ -373,11 +373,9 @@ export const AuthProvider = ({ children }) => {
             updateRole,
             refreshUser,
             isAuthenticated: !!user,
-            isBuilder: user?.role === 'BUILDER',
-            isInvestor: user?.role === 'INVESTOR',
-            isMod: user?.role === 'MOD',
+            isMod: user?.role === 'MODERATOR',
             isAdmin: !!user?.isAdmin,
-            isStaff: !!user?.isAdmin || user?.role === 'MOD',
+            isStaff: !!user?.isAdmin || user?.role === 'MODERATOR',
         }}>
             {children}
             {showPasskeyPrompt && (

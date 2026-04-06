@@ -187,7 +187,7 @@ const Following = () => {
         <div className="following-wrapper">
             <div className="header page-title-block">
                 <h1>Network</h1>
-                <p className="subtitle">Your connections across the BIES ecosystem.</p>
+                <p className="subtitle">Your connections across the community.</p>
             </div>
 
             <div className="tab-control-row">
