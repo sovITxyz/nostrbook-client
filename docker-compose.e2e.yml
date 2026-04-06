@@ -1,0 +1,138 @@
+# Two independent nostrbook instances for E2E relay testing.
+# Instance A: nginx on 8082, relay on 7777
+# Instance B: nginx on 8083, relay on 7778
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up --build -d
+#   docker compose -f docker-compose.e2e.yml down -v
+
+# ─── Instance A ──────────────────────────────────────────────────────────────
+
+services:
+  e2e-server-a:
+    build:
+      context: .
+      target: server
+    restart: "no"
+    env_file: server/.env.e2e-a
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: "file:../data/nostrbook.db"
+      NOSTR_PRIVATE_RELAY: "ws://e2e-relay-a:7777"
+      BASE_PATH: ""
+    volumes:
+      - e2e-data-a:/app/data
+      - e2e-uploads-a:/app/uploads
+    networks:
+      - e2e-net-a
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  e2e-relay-a:
+    build:
+      context: ./relay
+    restart: "no"
+    environment:
+      WS_PORT: "7777"
+      WS_HOST: "0.0.0.0"
+      STORAGE_PATH: "/app/data"
+      SWARM_TOPIC: "e2e-instance-a"
+      RELAY_NAME: "E2E Relay A"
+      RELAY_DESCRIPTION: "E2E test relay instance A"
+      WOT_DISCOVERY: "false"
+    volumes:
+      - e2e-relay-a:/app/data
+    networks:
+      - e2e-net-a
+
+  e2e-nginx-a:
+    build:
+      context: .
+      target: nginx
+    restart: "no"
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - e2e-uploads-a:/app/uploads:ro
+    depends_on:
+      e2e-server-a:
+        condition: service_healthy
+    networks:
+      - e2e-net-a
+
+# ─── Instance B ──────────────────────────────────────────────────────────────
+
+  e2e-server-b:
+    build:
+      context: .
+      target: server
+    restart: "no"
+    env_file: server/.env.e2e-b
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: "file:../data/nostrbook.db"
+      NOSTR_PRIVATE_RELAY: "ws://e2e-relay-b:7777"
+      BASE_PATH: ""
+    volumes:
+      - e2e-data-b:/app/data
+      - e2e-uploads-b:/app/uploads
+    networks:
+      - e2e-net-b
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  e2e-relay-b:
+    build:
+      context: ./relay
+    restart: "no"
+    environment:
+      WS_PORT: "7777"
+      WS_HOST: "0.0.0.0"
+      STORAGE_PATH: "/app/data"
+      SWARM_TOPIC: "e2e-instance-b"
+      RELAY_NAME: "E2E Relay B"
+      RELAY_DESCRIPTION: "E2E test relay instance B"
+      WOT_DISCOVERY: "false"
+    volumes:
+      - e2e-relay-b:/app/data
+    networks:
+      - e2e-net-b
+
+  e2e-nginx-b:
+    build:
+      context: .
+      target: nginx
+    restart: "no"
+    ports:
+      - "127.0.0.1:8083:8080"
+    volumes:
+      - e2e-uploads-b:/app/uploads:ro
+    depends_on:
+      e2e-server-b:
+        condition: service_healthy
+    networks:
+      - e2e-net-b
+
+volumes:
+  e2e-data-a:
+  e2e-uploads-a:
+  e2e-relay-a:
+  e2e-data-b:
+  e2e-uploads-b:
+  e2e-relay-b:
+
+networks:
+  e2e-net-a:
+    driver: bridge
+  e2e-net-b:
+    driver: bridge
