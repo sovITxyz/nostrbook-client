@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Filter, SlidersHorizontal, MapPin, Calendar as CalendarIcon, Clock, Users, Globe, Plus, ShieldCheck, Award, ChevronLeft, ChevronRight, X, Loader2, Ticket } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, MapPin, Calendar as CalendarIcon, Clock, Users, Globe, Plus, Award, ChevronLeft, ChevronRight, X, Loader2, Ticket } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getAssetUrl } from '../utils/assets';
 import { stripHtml } from '../utils/text';
@@ -8,93 +8,66 @@ import { eventsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useViewPreference } from '../context/ViewContext';
 
-const MOCK_OFFICIAL_EVENTS = [
+const MOCK_EVENTS = [
     {
-        id: 'mock-off-1',
-        title: 'Bitcoin & Business Summit El Salvador 2026',
-        description: 'The flagship annual gathering for builders, investors, and entrepreneurs building the Bitcoin economy in El Salvador. Featuring keynotes, panels, and deal-making sessions.',
+        id: 'mock-1',
+        title: 'Bitcoin & Builders Global Summit 2026',
+        description: 'A global gathering for builders, investors, and entrepreneurs across the Bitcoin and Nostr ecosystems. Keynotes, panels, and networking.',
         category: 'CONFERENCE',
         startDate: '2026-04-15T09:00:00Z',
-        location: 'Hotel Decameron, Santa Elena, El Salvador',
-        isOfficial: true,
+        location: 'Lisbon, Portugal',
         isOnline: false,
         coverImage: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
-        externalUrl: 'https://satlantis.io',
     },
     {
-        id: 'mock-off-2',
+        id: 'mock-2',
         title: 'Lightning Applications Hackathon',
-        description: 'A 48-hour hackathon focused on building Lightning Network-powered applications. Cash prizes and mentorship from top Bitcoin developers in the ecosystem.',
+        description: 'A 48-hour online hackathon building Lightning Network-powered applications. Open to developers worldwide with cash prizes and mentorship.',
         category: 'HACKATHON',
         startDate: '2026-05-03T10:00:00Z',
-        location: 'Chivo Lab, San Salvador, El Salvador',
-        isOfficial: true,
-        isOnline: false,
-        coverImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80',
-        externalUrl: 'https://satlantis.io',
-    },
-    {
-        id: 'mock-off-3',
-        title: 'Investor Demo Day — Spring 2026',
-        description: 'Top community-vetted startups pitch live to a curated audience of Bitcoin-native investors. Apply to present or register as an investor to attend.',
-        category: 'DEMO_DAY',
-        startDate: '2026-05-20T14:00:00Z',
-        location: 'Virtual & In-Person — San Salvador',
-        isOfficial: true,
+        location: 'Online',
         isOnline: true,
-        coverImage: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80',
-        externalUrl: 'https://satlantis.io',
-    },
-];
-
-const MOCK_COMMUNITY_EVENTS = [
-    {
-        id: 'mock-com-1',
-        title: 'Bitcoin Builders Meetup — San Salvador',
-        description: 'Monthly casual meetup for developers and founders building on Bitcoin. Share what you\'re working on, swap ideas, and connect with the local community.',
-        category: 'MEETUP',
-        startDate: '2026-03-18T18:30:00Z',
-        location: 'La Ventana Café, San Salvador',
-        isOfficial: false,
-        isOnline: false,
-        coverImage: 'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=800&q=80',
-        externalUrl: 'https://lu.ma',
+        coverImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80',
     },
     {
-        id: 'mock-com-2',
-        title: 'Nostr for Builders Workshop',
-        description: 'Hands-on session covering Nostr protocol basics, key management, and how to integrate Nostr identity into your product. Bring a laptop.',
+        id: 'mock-3',
+        title: 'Nostr Protocol Workshop',
+        description: 'Hands-on session covering Nostr protocol basics, key management, relay architecture, and building your first Nostr app.',
         category: 'WORKSHOP',
-        startDate: '2026-03-25T10:00:00Z',
+        startDate: '2026-05-10T16:00:00Z',
         location: 'Online — Zoom',
-        isOfficial: false,
         isOnline: true,
         coverImage: 'https://images.unsplash.com/photo-1516321165247-4aa89a48be55?w=800&q=80',
-        externalUrl: 'https://lu.ma',
     },
     {
-        id: 'mock-com-3',
-        title: 'El Salvador Founders Networking Night',
-        description: 'An informal evening for founders building in El Salvador to connect over drinks, share lessons learned, and explore collaboration opportunities.',
-        category: 'NETWORKING',
-        startDate: '2026-04-08T19:00:00Z',
-        location: 'Rooftop Bar La Terraza, Santa Tecla',
-        isOfficial: false,
+        id: 'mock-4',
+        title: 'Community Builders Meetup — London',
+        description: 'Monthly casual meetup for community leaders and builders. Share what you\'re working on and connect with like-minded people.',
+        category: 'MEETUP',
+        startDate: '2026-04-22T18:30:00Z',
+        location: 'Shoreditch, London, UK',
         isOnline: false,
-        coverImage: 'https://images.unsplash.com/photo-1515169067868-5387ec356754?w=800&q=80',
-        externalUrl: 'https://lu.ma',
+        coverImage: 'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=800&q=80',
     },
     {
-        id: 'mock-com-4',
-        title: 'Lightning Payments Deep Dive',
-        description: 'Technical walkthrough of Lightning payment flows, BOLT specs, and practical integration patterns for apps targeting the Salvadoran market.',
-        category: 'WORKSHOP',
-        startDate: '2026-04-22T17:00:00Z',
-        location: 'Online — Google Meet',
-        isOfficial: false,
+        id: 'mock-5',
+        title: 'Startup Demo Day — Spring 2026',
+        description: 'Community-vetted startups pitch live to investors. Apply to present or register as an investor to attend.',
+        category: 'DEMO_DAY',
+        startDate: '2026-05-20T14:00:00Z',
+        location: 'Virtual & In-Person',
+        isOnline: true,
+        coverImage: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80',
+    },
+    {
+        id: 'mock-6',
+        title: 'Open Source Contributor Sprint',
+        description: 'A focused sprint for open source contributors. Pick an issue, pair with a maintainer, and ship a PR in a day.',
+        category: 'SPRINT',
+        startDate: '2026-06-01T09:00:00Z',
+        location: 'Online — Discord',
         isOnline: true,
         coverImage: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80',
-        externalUrl: 'https://lu.ma',
     },
 ];
 
@@ -105,6 +78,14 @@ const EVENT_CATEGORY_COLORS = {
     MEETUP: 'var(--color-green-tint)',
     NETWORKING: 'var(--color-red-tint)',
     DEMO_DAY: 'var(--color-orange-tint)',
+    WEBINAR: 'var(--color-blue-tint)',
+    AMA: 'var(--color-green-tint)',
+    SUMMIT: 'var(--color-amber-tint)',
+    SPRINT: 'var(--color-orange-tint)',
+    COURSE: 'var(--color-blue-tint)',
+    SOCIAL: 'var(--color-red-tint)',
+    FUNDRAISER: 'var(--color-green-tint)',
+    OTHER: 'var(--color-gray-100)',
 };
 
 const EventCard = ({ event, isOfficial, viewType = 'standard' }) => {
@@ -451,54 +432,48 @@ const Events = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
     const { defaultView } = useViewPreference();
-    const [rawOfficialEvents, setRawOfficialEvents] = useState([]);
-    const [rawCommunityEvents, setRawCommunityEvents] = useState([]);
+    const [rawEvents, setRawEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('');
     const [selectedDate, setSelectedDate] = useState(null);
-    const [showOfficial, setShowOfficial] = useState(true);
-    const [showCommunity, setShowCommunity] = useState(true);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [eventViewType, setEventViewType] = useState(() => localStorage.getItem('nb_events_view') || defaultView);
     const [viewMenuOpen, setViewMenuOpen] = useState(false);
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
     const categories = [
-        { id: 'NETWORKING', label: 'Networking' },
         { id: 'CONFERENCE', label: 'Conference' },
+        { id: 'SUMMIT', label: 'Summit' },
+        { id: 'MEETUP', label: 'Meetup' },
         { id: 'WORKSHOP', label: 'Workshop' },
         { id: 'HACKATHON', label: 'Hackathon' },
-        { id: 'MEETUP', label: 'Meetup' },
+        { id: 'WEBINAR', label: 'Webinar' },
+        { id: 'AMA', label: 'AMA' },
+        { id: 'NETWORKING', label: 'Networking' },
         { id: 'DEMO_DAY', label: 'Demo Day' },
+        { id: 'SPRINT', label: 'Sprint' },
+        { id: 'COURSE', label: 'Course' },
+        { id: 'SOCIAL', label: 'Social' },
+        { id: 'FUNDRAISER', label: 'Fundraiser' },
+        { id: 'OTHER', label: 'Other' },
     ];
 
     useEffect(() => {
         const fetchEvents = async () => {
             setLoading(true);
             try {
-                const officialParams = { upcoming: true, isOfficial: 'true' };
-                if (search) officialParams.search = search;
-                if (category) officialParams.category = category;
+                const params = { upcoming: true };
+                if (search) params.search = search;
+                if (category) params.category = category;
 
-                const communityParams = { upcoming: true, isOfficial: 'false' };
-                if (search) communityParams.search = search;
-                if (category) communityParams.category = category;
+                const result = await eventsApi.list(params);
+                const list = result?.data || result || [];
 
-                const [offResult, commResult] = await Promise.all([
-                    eventsApi.list(officialParams),
-                    eventsApi.list(communityParams)
-                ]);
-
-                const offList = offResult?.data || offResult || [];
-                const commList = commResult?.data || commResult || [];
-
-                setRawOfficialEvents(Array.isArray(offList) && offList.length > 0 ? offList : MOCK_OFFICIAL_EVENTS);
-                setRawCommunityEvents(Array.isArray(commList) && commList.length > 0 ? commList : MOCK_COMMUNITY_EVENTS);
+                setRawEvents(Array.isArray(list) && list.length > 0 ? list : MOCK_EVENTS);
             } catch (err) {
                 console.error('Fetch events error:', err);
-                setRawOfficialEvents(MOCK_OFFICIAL_EVENTS);
-                setRawCommunityEvents(MOCK_COMMUNITY_EVENTS);
+                setRawEvents(MOCK_EVENTS);
             } finally {
                 setLoading(false);
             }
@@ -507,28 +482,22 @@ const Events = () => {
         return () => clearTimeout(debounce);
     }, [search, category]);
 
-    // Derive displayed lists — apply selectedDate filter client-side
-    const officialEvents = useMemo(() => {
-        if (!selectedDate) return rawOfficialEvents;
+    // Derive displayed list — apply selectedDate filter client-side
+    const events = useMemo(() => {
+        if (!selectedDate) return rawEvents;
         const dateStr = selectedDate.toISOString().split('T')[0];
-        return rawOfficialEvents.filter(e => (e.startDate || e.date || '').startsWith(dateStr));
-    }, [rawOfficialEvents, selectedDate]);
-
-    const communityEvents = useMemo(() => {
-        if (!selectedDate) return rawCommunityEvents;
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        return rawCommunityEvents.filter(e => (e.startDate || e.date || '').startsWith(dateStr));
-    }, [rawCommunityEvents, selectedDate]);
+        return rawEvents.filter(e => (e.startDate || e.date || '').startsWith(dateStr));
+    }, [rawEvents, selectedDate]);
 
     // Build a Set of date strings that have events, for calendar dot indicators
     const eventDates = useMemo(() => {
         const dates = new Set();
-        [...rawOfficialEvents, ...rawCommunityEvents].forEach(e => {
+        rawEvents.forEach(e => {
             const d = e.startDate || e.date;
             if (d) dates.add(d.substring(0, 10));
         });
         return dates;
-    }, [rawOfficialEvents, rawCommunityEvents]);
+    }, [rawEvents]);
 
     // Calendar Helper
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -680,21 +649,7 @@ const Events = () => {
                     </div>
 
                     <aside className="filters">
-                        <div className="filter-group">
-                            <label>{t('events.eventTypes')}</label>
-                            <div className="checkbox-list">
-                                <label>
-                                    <input type="checkbox" checked={showOfficial} onChange={e => setShowOfficial(e.target.checked)} />
-                                    {t('events.officialEvents')}
-                                </label>
-                                <label>
-                                    <input type="checkbox" checked={showCommunity} onChange={e => setShowCommunity(e.target.checked)} />
-                                    {t('events.communityEvents')}
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="filter-group" style={{ marginBottom: 0 }}>
+                        <div className="filter-group" style={{ marginBottom: '1.5rem' }}>
                             <label>{t('events.categories')}</label>
                             <div className="checkbox-list">
                                 <button
@@ -725,42 +680,16 @@ const Events = () => {
                         </div>
                     ) : (
                         <>
-                            {/* Official Events Section */}
-                            {showOfficial && officialEvents.length > 0 && (
-                                <section className="events-section official-section">
-                                    <div className="section-header">
-                                        <ShieldCheck size={24} className="text-secondary" />
-                                        <h2>{t('events.officialBIES')}</h2>
-                                    </div>
+                            {events.length === 0 ? (
+                                <div className="empty-state">{t('events.noEvents', 'No events found. Try a different category or date.')}</div>
+                            ) : (
+                                <section className="events-section">
                                     <div className={eventViewType === 'list' ? 'events-list-layout' : 'events-grid'}>
-                                        {officialEvents.map(event => (
-                                            <EventCard key={event.id} event={event} isOfficial={true} viewType={eventViewType} />
+                                        {events.map(event => (
+                                            <EventCard key={event.id} event={event} isOfficial={false} viewType={eventViewType} />
                                         ))}
                                     </div>
                                 </section>
-                            )}
-
-                            {/* Community Events Section */}
-                            {showCommunity && (
-                                <section className="events-section community-section">
-                                    <div className="section-header">
-                                        <Users size={24} className="text-primary" />
-                                        <h2>{t('events.communityBIES')}</h2>
-                                    </div>
-                                    {communityEvents.length === 0 ? (
-                                        <div className="empty-state">{t('events.noCommunityEvents')}</div>
-                                    ) : (
-                                        <div className={eventViewType === 'list' ? 'events-list-layout' : 'events-grid'}>
-                                            {communityEvents.map(event => (
-                                                <EventCard key={event.id} event={event} isOfficial={false} viewType={eventViewType} />
-                                            ))}
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-
-                            {!showOfficial && !showCommunity && (
-                                <div className="empty-state">{t('events.selectEventTypes')}</div>
                             )}
                         </>
                     )}
@@ -884,8 +813,8 @@ const Events = () => {
                 }
 
                 .checkbox-list {
-                    display: flex;
-                    flex-direction: column;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
                     gap: 0.5rem;
                     align-items: flex-start;
                 }
@@ -1070,6 +999,7 @@ const Events = () => {
                     }
                     .filters-column.mobile-open {
                         display: flex;
+                        margin-bottom: 1.5rem;
                     }
                     .filters { width: 100%; }
                     .events-grid { grid-template-columns: 1fr; }
