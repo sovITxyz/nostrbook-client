@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Users, ArrowLeft, Share2, MessageSquare, Loader2, Heart, AlertTriangle, ExternalLink, FileText, Globe, Briefcase, TrendingUp, Target, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Users, ArrowLeft, Share2, MessageSquare, Loader2, Heart, AlertTriangle, ExternalLink, FileText, Globe, Briefcase, TrendingUp, Target, Layers, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { projectsApi, analyticsApi, watchlistApi } from '../services/api';
 import DeckRequestButton from '../components/DeckRequestButton';
 import ZapButton from '../components/ZapButton';
@@ -12,6 +12,7 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { useAuth } from '../context/AuthContext';
 import { useUserMode } from '../context/UserModeContext';
 import { useLightbox } from '../context/LightboxContext';
+import ReportModal from '../components/ReportModal';
 
 const ProjectDetails = () => {
     const { id } = useParams();
@@ -27,6 +28,7 @@ const ProjectDetails = () => {
     const [showInterestModal, setShowInterestModal] = useState(false);
     const [expressingInterest, setExpressingInterest] = useState(false);
     const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     useEffect(() => {
         const fetchProject = async () => {
@@ -176,6 +178,9 @@ const ProjectDetails = () => {
                     <button className="pd-btn pd-btn-outline" onClick={handleShare}>
                         <Share2 size={16} />
                         {shareTooltip ? t('projectDetails.copied', 'Copied!') : t('projectDetails.share', 'Share')}
+                    </button>
+                    <button className="pd-btn pd-btn-outline" onClick={() => setShowReportModal(true)}>
+                        <Flag size={16} /> {t('projectDetails.report', 'Report')}
                     </button>
                     <button className="pd-btn pd-btn-primary" onClick={() => window.open(`/messages?to=${project.ownerId || project.owner?.id}`, '_self')}>
                         <MessageSquare size={16} /> {t('projectDetails.contactFounder', 'Contact Founder')}
@@ -775,6 +780,17 @@ const ProjectDetails = () => {
                     .pd-sidebar-section .pd-graph-section { height: 260px !important; }
                 }
             `}</style>
+
+            {/* Report Modal */}
+            {showReportModal && (
+                <ReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    targetType="PROJECT"
+                    targetId={id}
+                    targetLabel="Project"
+                />
+            )}
         </div>
     );
 };

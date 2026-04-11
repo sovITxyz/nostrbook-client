@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Zap } from 'lucide-react';
 import ZapModal from './ZapModal';
+import { canShowLightning } from '../utils/platform';
 
 /**
  * Reusable zap button that opens a ZapModal for Lightning payments.
@@ -15,6 +16,9 @@ import ZapModal from './ZapModal';
  */
 const ZapButton = ({ recipients = [], eventId, size = 'md', variant = 'default', className = '', label }) => {
     const [showModal, setShowModal] = useState(false);
+
+    // Hide Lightning features on iOS native (Apple App Store restriction)
+    if (!canShowLightning()) return null;
 
     // Don't render if no recipients have pubkeys
     const validRecipients = recipients.filter(r => r.pubkey);

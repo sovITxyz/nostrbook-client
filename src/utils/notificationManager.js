@@ -1,7 +1,9 @@
 /**
  * Notification manager — handles browser notifications
- * for incoming messages. Works in both browser tabs and standalone PWA.
+ * for incoming messages. Works in both browser tabs, standalone PWA,
+ * and native Capacitor apps (iOS APNs / Android FCM).
  */
+import { isNative } from './platform';
 
 const recentlyNotified = new Set();
 
@@ -169,6 +171,17 @@ export async function unsubscribeFromPush() {
  * Check if the user currently has an active push subscription.
  */
 export async function getPushSubscriptionState() {
+    // Native apps use Capacitor push — check that first
+    if (isNative()) {
+        try {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            const result = await PushNotifications.checkPermissions();
+            return { supported: true, subscribed: result.receive === 'granted' };
+        } catch {
+            return { supported: false, subscribed: false };
+        }
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         return { supported: false, subscribed: false };
     }
@@ -179,5 +192,56 @@ export async function getPushSubscriptionState() {
         return { supported: true, subscribed: !!subscription };
     } catch {
         return { supported: true, subscribed: false };
+    }
+}
+
+// ─── Native Push (Capacitor — APNs/FCM) ────────────────────────────────────
+
+/**
+ * Register for native push notifications via Capacitor.
+ * Handles APNs (iOS) and FCM (Android) token registration.
+ * Returns the device token string, or null on failure.
+ */
+export async function registerNativePush(onNotification) {
+    if (!isNative()) return null;
+
+    try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+
+        // Request permission
+        const permission = await PushNotifications.requestPermissions();
+        if (permission.receive !== 'granted') return null;
+
+        // Register with APNs/FCM
+        await PushNotifications.register();
+
+        // Listen for registration success (returns device token)
+        return new Promise((resolve) => {
+            PushNotifications.addListener('registration', (token) => {
+                console.log('[NativePush] Registered:', token.value);
+                resolve(token.value);
+            });
+
+            PushNotifications.addListener('registrationError', (error) => {
+                console.error('[NativePush] Registration failed:', error);
+                resolve(null);
+            });
+
+            // Listen for incoming notifications when app is open
+            if (onNotification) {
+                PushNotifications.addListener('pushNotificationReceived', onNotification);
+            }
+
+            // Listen for notification taps (app was in background)
+            PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+                const data = action.notification?.data;
+                if (data?.url) {
+                    window.location.href = data.url;
+                }
+            });
+        });
+    } catch (error) {
+        console.error('[NativePush] Init failed:', error);
+        return null;
     }
 }

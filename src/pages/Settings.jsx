@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Moon, Bell, Lock, Globe, Eye, Zap, LayoutGrid, Play, Key, Copy, CheckCircle, EyeOff, AlertTriangle, Fingerprint } from 'lucide-react';
+import { Moon, Bell, Lock, Globe, Eye, Zap, LayoutGrid, Play, Key, Copy, CheckCircle, EyeOff, AlertTriangle, Fingerprint, FileText, Download, Trash2, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import WalletConnect from '../components/WalletConnect';
 import { useTheme } from '../context/ThemeContext';
 import { useViewPreference } from '../context/ViewContext';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { investorApi, preferencesApi, notificationsApi } from '../services/api';
+import { investorApi, preferencesApi, notificationsApi, accountApi, blocksApi } from '../services/api';
 import { requestNotificationPermission, subscribeToPush, unsubscribeFromPush, getPushSubscriptionState } from '../utils/notificationManager';
 import { nostrSigner } from '../services/nostrSigner';
 import { keytrService, isLikelyExtensionInterference } from '../services/keytrService';
 import { PASSKEY_ENABLED } from '../config/featureFlags';
+import { canShowLightning } from '../utils/platform';
 
 const Settings = () => {
     const { theme, setTheme } = useTheme();
@@ -231,6 +233,89 @@ const Settings = () => {
         }
     };
 
+    // ── Danger Zone state ──────────────────────────────────────────────────────
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [deletingAccount, setDeletingAccount] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+    const [cancellingDeletion, setCancellingDeletion] = useState(false);
+    const [cancelError, setCancelError] = useState('');
+    const [exportingData, setExportingData] = useState(false);
+
+    // Blocked users state
+    const [blockedUsers, setBlockedUsers] = useState([]);
+    const [loadingBlocked, setLoadingBlocked] = useState(false);
+
+    useEffect(() => {
+        setLoadingBlocked(true);
+        blocksApi.list().then(res => setBlockedUsers(res.data || res || [])).catch(() => {}).finally(() => setLoadingBlocked(false));
+    }, []);
+
+    const handleUnblock = async (userId) => {
+        await blocksApi.unblock(userId);
+        setBlockedUsers(prev => prev.filter(u => u.id !== userId));
+    };
+
+    // pendingDeletion is flagged by the auth middleware when deletedAt is set
+    const pendingDeletion = user?.pendingDeletion ?? false;
+    const deletionScheduledAt = user?.deletedAt ? new Date(user.deletedAt) : null;
+    const deletionDeadline = deletionScheduledAt
+        ? new Date(deletionScheduledAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+        : null;
+
+    const handleExportData = useCallback(async () => {
+        setExportingData(true);
+        try {
+            // Use raw fetch so we can handle the file download
+            const token = localStorage.getItem('nb_token');
+            const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+            const res = await fetch(`${BASE_URL}/settings/account/export`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (!res.ok) throw new Error('Export failed');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nostrbook-data-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            // silently ignore — user will see no download
+        } finally {
+            setExportingData(false);
+        }
+    }, []);
+
+    const handleDeleteAccount = useCallback(async () => {
+        setDeleteError('');
+        setDeletingAccount(true);
+        try {
+            await accountApi.delete();
+            // Clear local session — account is now pending deletion
+            localStorage.removeItem('nb_token');
+            localStorage.removeItem('nb_user');
+            window.location.href = '/';
+        } catch (err) {
+            setDeleteError(err.message || 'Failed to schedule account deletion.');
+            setDeletingAccount(false);
+        }
+    }, []);
+
+    const handleCancelDeletion = useCallback(async () => {
+        setCancelError('');
+        setCancellingDeletion(true);
+        try {
+            await accountApi.cancelDeletion();
+            window.location.reload();
+        } catch (err) {
+            setCancelError(err.message || 'Failed to cancel account deletion.');
+            setCancellingDeletion(false);
+        }
+    }, []);
+
     return (
         <div className="container py-8 max-w-3xl" style={{ paddingTop: '1.5rem' }}>
             <h1 className="mb-8 page-title-block">{t('settings.title')}</h1>
@@ -375,6 +460,25 @@ const Settings = () => {
             </div>
 
             <div className="settings-section">
+                <h2><Shield size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} /> Blocked Users</h2>
+                {loadingBlocked ? (
+                    <div className="setting-item" style={{ color: 'var(--color-gray-400)' }}>Loading...</div>
+                ) : blockedUsers.length === 0 ? (
+                    <div className="setting-item" style={{ color: 'var(--color-gray-400)' }}>No blocked users</div>
+                ) : (
+                    blockedUsers.map(user => (
+                        <div key={user.id} className="setting-item">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <img src={user.profile?.avatar || '/default-avatar.png'} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} />
+                                <span>{user.profile?.name || 'Unknown'}</span>
+                            </div>
+                            <button onClick={() => handleUnblock(user.id)} className="btn btn-outline btn-sm">Unblock</button>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="settings-section">
                 <h2>Account Roles</h2>
                 {user?.role === 'INVESTOR' ? (
                     <div className="setting-item">
@@ -440,12 +544,14 @@ const Settings = () => {
                 </div>
             </div>
 
+            {canShowLightning() && (
             <div className="settings-section">
                 <h2><Zap size={16} /> {t('settings.lightningWallet')}</h2>
                 <div className="setting-item">
                     <WalletConnect />
                 </div>
             </div>
+            )}
 
             {npub && (
             <div className="settings-section">
@@ -606,6 +712,137 @@ const Settings = () => {
             </div>
             )}
 
+            {/* Danger Zone */}
+            <div className="settings-section danger-zone-section">
+                <h2 style={{ color: 'var(--color-danger, #dc2626)' }}>
+                    <AlertTriangle size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                    Danger Zone
+                </h2>
+
+                {/* Pending deletion banner */}
+                {pendingDeletion && deletionDeadline && (
+                    <div className="deletion-warning-banner">
+                        <AlertTriangle size={16} />
+                        <span>
+                            Your account is scheduled for deletion on{' '}
+                            <strong>{deletionDeadline.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
+                            Cancel before that date to keep your account.
+                        </span>
+                    </div>
+                )}
+
+                {/* Export data */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <div className="icon-box"><Download size={20} /></div>
+                        <div>
+                            <p className="setting-label">Export My Data</p>
+                            <p className="setting-desc">Download a copy of all your Nostrbook data as JSON.</p>
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={handleExportData}
+                        disabled={exportingData}
+                    >
+                        {exportingData ? 'Exporting...' : 'Export'}
+                    </button>
+                </div>
+
+                {/* Delete / Cancel deletion */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <div className="icon-box" style={{ background: 'var(--color-danger-light, #fef2f2)', color: 'var(--color-danger, #dc2626)' }}>
+                            <Trash2 size={20} />
+                        </div>
+                        <div>
+                            <p className="setting-label">{pendingDeletion ? 'Cancel Account Deletion' : 'Delete Account'}</p>
+                            <p className="setting-desc">
+                                {pendingDeletion
+                                    ? 'Your account is in the 30-day grace period. Click to restore it.'
+                                    : 'Permanently delete your account after a 30-day grace period.'}
+                            </p>
+                        </div>
+                    </div>
+                    {pendingDeletion ? (
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={handleCancelDeletion}
+                            disabled={cancellingDeletion}
+                        >
+                            {cancellingDeletion ? 'Cancelling...' : 'Cancel Deletion'}
+                        </button>
+                    ) : (
+                        <button
+                            className="btn btn-outline btn-sm btn-danger-outline"
+                            onClick={() => { setShowDeleteDialog(true); setDeleteConfirmText(''); setDeleteError(''); }}
+                        >
+                            Delete Account
+                        </button>
+                    )}
+                </div>
+                {cancelError && (
+                    <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', padding: '0 1.5rem 0.75rem', margin: 0 }}>{cancelError}</p>
+                )}
+            </div>
+
+            {/* Delete confirmation dialog */}
+            {showDeleteDialog && (
+                <div className="delete-dialog-overlay" onClick={() => setShowDeleteDialog(false)}>
+                    <div className="delete-dialog" onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ color: 'var(--color-danger, #dc2626)', marginBottom: '0.5rem' }}>
+                            <Trash2 size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                            Delete Account
+                        </h3>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--color-gray-600)', marginBottom: '1rem', lineHeight: 1.5 }}>
+                            Your account will be scheduled for deletion. You have <strong>30 days</strong> to cancel.
+                            After that, all your data will be permanently removed.
+                        </p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--color-gray-600)', marginBottom: '0.5rem' }}>
+                            Type <strong>DELETE</strong> to confirm:
+                        </p>
+                        <input
+                            className="select-input"
+                            style={{ width: '100%', marginBottom: '1rem' }}
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="DELETE"
+                            autoFocus
+                        />
+                        {deleteError && (
+                            <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{deleteError}</p>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button
+                                className="btn btn-outline btn-sm"
+                                onClick={() => setShowDeleteDialog(false)}
+                                disabled={deletingAccount}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-sm btn-danger-solid"
+                                onClick={handleDeleteAccount}
+                                disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+                            >
+                                {deletingAccount ? 'Deleting...' : 'Delete My Account'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Legal */}
+            <div className="settings-section">
+                <h2><FileText size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} /> Legal</h2>
+                <div className="setting-item">
+                    <Link to="/privacy" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500 }}>Privacy Policy</Link>
+                </div>
+                <div className="setting-item">
+                    <Link to="/terms" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500 }}>Terms of Service</Link>
+                </div>
+            </div>
+
             <div className="version-footer">
                 Nostrbook v{__APP_VERSION__}
             </div>
@@ -661,6 +898,20 @@ const Settings = () => {
                 .passkey-success { font-size: 0.8rem; color: var(--color-green-700, #15803d); margin: 0; }
 
                 .version-footer { text-align: center; padding: 1.5rem 0 0.5rem; font-size: 0.75rem; color: var(--color-gray-400); letter-spacing: 0.02em; }
+
+                /* Danger Zone */
+                .danger-zone-section { border-color: var(--color-danger-light, #fecaca); }
+                .danger-zone-section h2 { background: var(--color-danger-light, #fef2f2); border-bottom-color: var(--color-danger-light, #fecaca); }
+
+                .deletion-warning-banner { display: flex; align-items: flex-start; gap: 0.6rem; margin: 0.75rem 1.5rem; padding: 0.75rem 1rem; background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius-md); font-size: 0.875rem; color: #92400e; line-height: 1.5; }
+                .deletion-warning-banner svg { flex-shrink: 0; margin-top: 2px; color: #f97316; }
+
+                .btn-danger-solid { background: var(--color-danger, #dc2626); color: white; border: 1px solid var(--color-danger, #dc2626); border-radius: var(--radius-md); cursor: pointer; }
+                .btn-danger-solid:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+                .btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+                .delete-dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+                .delete-dialog { background: var(--color-surface); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
             `}</style>
         </div>
     );

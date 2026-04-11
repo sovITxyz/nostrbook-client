@@ -13,6 +13,7 @@ import { auditLog } from './middleware/audit';
 import { attachWebSocketServer } from './services/websocket.service';
 import { startTwitterRefreshLoop } from './services/twitter.service';
 import { initWebPush, cleanupStaleSubscriptions } from './services/webpush.service';
+import { startAccountCleanup } from './services/accountCleanup.service';
 
 // ─── Version ─────────────────────────────────────────────────────────────────
 const versionFile = path.resolve(__dirname, '..', '..', 'version.json');
@@ -40,6 +41,8 @@ import mediaRoutes from './routes/media.routes';
 import nip05Routes from './routes/nip05.routes';
 import walletRoutes from './routes/wallet.routes';
 import feedbackRoutes from './routes/feedback.routes';
+import reportRoutes from './routes/report.routes';
+import blockRoutes from './routes/block.routes';
 
 const app = express();
 
@@ -191,6 +194,8 @@ app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/blocks', blockRoutes);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -228,6 +233,9 @@ server.listen(config.port, () => {
     // Initialize Web Push notifications
     initWebPush();
     cleanupStaleSubscriptions().catch(() => {});
+
+    // Start account cleanup (purges accounts past 30-day grace period)
+    startAccountCleanup();
 });
 
 export default app;

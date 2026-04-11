@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth';
 import { adminFeedbackRouter } from './feedback.routes';
+import { adminReportRouter } from './report.routes';
 import {
     listUsers,
     banUser,
@@ -59,5 +60,8 @@ router.post('/cache/clear', clearCache);
 
 // Feedback
 router.use('/feedback', adminFeedbackRouter);
+
+// Reports
+router.use('/reports', adminReportRouter);
 
 export default router;

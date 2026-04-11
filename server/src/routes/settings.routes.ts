@@ -14,6 +14,9 @@ import {
     updatePreferences,
     updatePreferencesSchema,
     deleteAccount,
+    deleteAccountSchema,
+    cancelDeletion,
+    exportData,
 } from '../controllers/settings.controller';
 
 const router = Router();
@@ -27,6 +30,8 @@ router.get('/media-read', getMediaRead);
 router.put('/media-read', validate(updateMediaReadSchema), updateMediaRead);
 router.get('/preferences', getPreferences);
 router.put('/preferences', validate(updatePreferencesSchema), updatePreferences);
-router.delete('/account', deleteAccount);
+router.delete('/account', validate(deleteAccountSchema), deleteAccount);
+router.put('/account/restore', cancelDeletion);
+router.get('/account/export', exportData);
 
 export default router;

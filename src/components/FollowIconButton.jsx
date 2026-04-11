@@ -57,6 +57,7 @@ const FollowIconButton = ({ targetUserId, isFollowing: initiallyFollowing, onTog
             onClick={handleToggleFollow}
             disabled={loading}
             title={following ? 'Unfollow' : 'Follow'}
+            aria-label={following ? 'Unfollow' : 'Follow'}
         >
             {loading ? (
                 <Loader2 size={iconSize} style={{ animation: 'spin 1s linear infinite' }} />

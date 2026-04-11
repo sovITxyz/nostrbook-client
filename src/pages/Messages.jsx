@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, Send, MoreVertical, Lock, MessageCircle, Loader2, AlertTriangle, X, ArrowLeft, Bell, BellOff } from 'lucide-react';
 import { useNostrDMs } from '../hooks/useNostr';
 import { nostrService } from '../services/nostrService';
-import { searchApi, notificationsApi } from '../services/api';
+import { searchApi, notificationsApi, blocksApi } from '../services/api';
 import { nip19 } from 'nostr-tools';
 import { notifyIncomingMessage, requestNotificationPermission, getNotificationPermission, subscribeToPush } from '../utils/notificationManager';
 
@@ -39,10 +39,19 @@ const Messages = () => {
     const [searchingUsers, setSearchingUsers] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
     const [mobileView, setMobileView] = useState('sidebar'); // 'sidebar' | 'chat'
+    const [blockedPubkeys, setBlockedPubkeys] = useState(new Set());
     const chatEndRef = useRef(null);
     const searchTimerRef = useRef(null);
     const messageInputRef = useRef(null);
     profilesRef.current = profiles;
+
+    // Fetch blocked users on mount
+    useEffect(() => {
+        blocksApi.list().then(res => {
+            const blocked = res.data || res || [];
+            setBlockedPubkeys(new Set(blocked.map(u => u.nostrPubkey).filter(Boolean)));
+        }).catch(() => {});
+    }, []);
 
     // Auto-connect on mount
     useEffect(() => {
@@ -206,7 +215,7 @@ const Messages = () => {
         return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     };
 
-    // Sort conversations by last message time
+    // Sort conversations by last message time, excluding blocked users
     const sortedConversations = Object.entries(conversations)
         .map(([pubkey, msgs]) => ({
             pubkey,
@@ -214,6 +223,7 @@ const Messages = () => {
             lastMessage: msgs[msgs.length - 1],
         }))
         .filter(c => {
+            if (blockedPubkeys.has(c.pubkey)) return false;
             if (!searchQuery) return true;
             const name = getDisplayName(c.pubkey).toLowerCase();
             return name.includes(searchQuery.toLowerCase());

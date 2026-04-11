@@ -23,6 +23,7 @@ const NoteFooter = ({
         className={`primal-action-btn ${isCommentsOpen ? 'active-reply' : ''}`}
         onClick={onToggleComments}
         title="Comments"
+        aria-label="Comments"
       >
         <MessageCircle size={16} className="primal-action-icon-reply" />
         <span className="primal-action-count">{stats.replies ? formatCount(stats.replies) : ''}</span>
@@ -33,6 +34,7 @@ const NoteFooter = ({
         className="primal-action-btn"
         onClick={onZap}
         title="Zap"
+        aria-label="Zap"
       >
         <Zap size={16} className="primal-action-icon-zap" />
         <span className="primal-action-count">{stats.satszapped ? formatSats(stats.satszapped) : ''}</span>
@@ -43,6 +45,7 @@ const NoteFooter = ({
         className={`primal-action-btn ${isLiked ? 'active-like' : ''}`}
         onClick={onLike}
         title="Like"
+        aria-label="Like"
       >
         <Heart size={16} className="primal-action-icon-like" fill={isLiked ? 'currentColor' : 'none'} />
         <span className="primal-action-count">{stats.likes ? formatCount(stats.likes) : ''}</span>
@@ -54,6 +57,7 @@ const NoteFooter = ({
           className={`primal-action-btn ${isReposted ? 'active-repost' : ''}`}
           onClick={onRepostMenuToggle}
           title="Repost"
+          aria-label="Repost"
         >
           <Repeat size={16} className="primal-action-icon-repost" />
           <span className="primal-action-count">{stats.reposts ? formatCount(stats.reposts) : ''}</span>
@@ -77,6 +81,7 @@ const NoteFooter = ({
         className="primal-action-btn primal-action-share"
         onClick={onShare}
         title="Share"
+        aria-label="Share"
       >
         <Share size={16} />
       </button>

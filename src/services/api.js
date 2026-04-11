@@ -61,7 +61,7 @@ const get = (path, params = {}) => {
 };
 const post = (path, body) => request('POST', path, body);
 const put = (path, body) => request('PUT', path, body);
-const del = (path) => request('DELETE', path);
+const del = (path, body) => request('DELETE', path, body);
 
 // ─── Form-data upload helper (for files) ─────────────────────────────────────
 
@@ -343,6 +343,8 @@ export const adminApi = {
     feedback: (params = {}) => get('/admin/feedback', params),
     updateFeedback: (id, data) => put(`/admin/feedback/${id}`, data),
     deleteFeedback: (id) => del(`/admin/feedback/${id}`),
+    reports: (params = {}) => get('/admin/reports', params),
+    updateReport: (id, data) => put(`/admin/reports/${id}`, data),
 };
 
 // ─── Content (Media / Blog / Resources) ──────────────────────────────────────
@@ -373,6 +375,20 @@ export const feedbackApi = {
     submit: (data) => post('/feedback', data),
 };
 
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+export const reportsApi = {
+    create: (data) => post('/reports', data),
+};
+
+// ─── Blocks ───────────────────────────────────────────────────────────────────
+
+export const blocksApi = {
+    list: () => get('/blocks'),
+    block: (userId) => post(`/blocks/${userId}`),
+    unblock: (userId) => del(`/blocks/${userId}`),
+};
+
 // ─── Media (Live Feeds) ──────────────────────────────────────────────────────
 
 export const mediaApi = {
@@ -387,6 +403,14 @@ export const mediaApi = {
 export const preferencesApi = {
     get: () => get('/settings/preferences'),
     save: (data) => put('/settings/preferences', data),
+};
+
+// ─── Account Management ───────────────────────────────────────────────────────
+
+export const accountApi = {
+    delete: () => del('/settings/account', { confirmation: 'DELETE' }),
+    cancelDeletion: () => put('/settings/account/restore'),
+    exportData: () => get('/settings/account/export'),
 };
 
 // ─── Health ───────────────────────────────────────────────────────────────────
