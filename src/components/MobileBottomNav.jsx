@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MessageSquare, Compass, Calendar, Play, User } from 'lucide-react';
+import { MessageSquare, Compass, Calendar, Play, User, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCommunity } from '../context/CommunityContext';
 import { useTranslation } from 'react-i18next';
 
 const itemStyle = (active) => ({
@@ -11,7 +12,7 @@ const itemStyle = (active) => ({
   justifyContent: 'center',
   gap: '3px',
   flex: 1,
-  color: active ? '#FF5B00' : 'white',
+  color: active ? 'var(--color-secondary)' : 'white',
   textDecoration: 'none',
   fontSize: '0.68rem',
   fontWeight: active ? 700 : 500,
@@ -26,19 +27,21 @@ const iconWrapStyle = (active) => ({
   width: '40px',
   height: '32px',
   borderRadius: '16px',
-  background: active ? 'rgba(255, 91, 0, 0.15)' : 'none',
+  background: active ? 'rgba(var(--color-secondary-rgb, 245, 158, 11), 0.15)' : 'none',
 });
 
 const MobileBottomNav = () => {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  const { isInCommunity } = useCommunity();
   const { t } = useTranslation();
 
   const tabs = [
     { path: '/feed', icon: MessageSquare, label: t('mobileNav.home') },
+    ...(!isInCommunity ? [{ path: '/communities', icon: Globe, label: 'Communities' }] : []),
     { path: '/discover', icon: Compass, label: t('mobileNav.discover') },
     { path: '/events', icon: Calendar, label: t('mobileNav.events') },
-    { path: '/media', icon: Play, label: t('nav.media') },
+    ...(isInCommunity ? [{ path: '/media', icon: Play, label: t('nav.media') }] : []),
     { path: '/dashboard', icon: User, label: t('mobileNav.dashboard'), auth: true },
   ];
 
@@ -53,8 +56,8 @@ const MobileBottomNav = () => {
         left: 0,
         right: 0,
         width: '100%',
-        background: 'var(--color-primary-nav, var(--color-primary))',
-        borderTop: '3px solid #FF5B00',
+        background: 'var(--color-primary)',
+        borderTop: '3px solid var(--color-secondary)',
         zIndex: 10000,
         WebkitTransform: 'translateZ(0)', /* force GPU compositing on iOS — belt-and-suspenders fix for position:fixed in scroll contexts */
       }} className="mobile-bottom-nav">

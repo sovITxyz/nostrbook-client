@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ViewProvider, useViewPreference } from './context/ViewContext';
 import { LightboxProvider } from './context/LightboxContext';
+import { CommunityProvider } from './context/CommunityContext';
 import { preferencesApi } from './services/api';
 import i18n from './i18n';
 import Navbar from './components/Navbar';
@@ -52,6 +53,7 @@ import AdminNewsSettings from './pages/admin/AdminNewsSettings';
 import AdminFeedback from './pages/admin/AdminFeedback';
 import AdminReports from './pages/admin/AdminReports';
 import Feedback from './pages/Feedback';
+import Communities from './pages/Communities';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
@@ -144,6 +146,7 @@ const AppContent = () => {
                     <Route path="/media" element={<ProtectedRoute><Media /></ProtectedRoute>} />
                     <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
                     <Route path="/news/:slug" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
+                    <Route path="/communities" element={<ProtectedRoute><Communities /></ProtectedRoute>} />
                     <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
 
                     {/* Protected Routes */}
@@ -239,13 +242,15 @@ function App() {
     return (
         <AuthProvider>
             <ThemeProvider>
-                <ViewProvider>
-                    <LightboxProvider>
-                        <Router basename="/" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                            <AppContent />
-                        </Router>
-                    </LightboxProvider>
-                </ViewProvider>
+                <CommunityProvider>
+                    <ViewProvider>
+                        <LightboxProvider>
+                            <Router basename="/" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                                <AppContent />
+                            </Router>
+                        </LightboxProvider>
+                    </ViewProvider>
+                </CommunityProvider>
             </ThemeProvider>
         </AuthProvider>
     );

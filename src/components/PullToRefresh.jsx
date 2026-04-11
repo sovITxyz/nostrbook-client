@@ -133,7 +133,7 @@ const PullToRefresh = ({ children, onRefresh }) => {
                     justify-content: center;
                     overflow: hidden;
                     width: 100%;
-                    color: var(--color-primary, #0047AB);
+                    color: var(--color-primary, #4F46E5);
                 }
                 .ptr-spinner {
                     display: flex;

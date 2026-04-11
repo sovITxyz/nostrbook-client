@@ -6,13 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { User, Search, ChevronDown, LogOut } from 'lucide-react';
 import NostrIcon from './NostrIcon';
 import NostrNotifications from './NostrNotifications';
-import logoHorizontalWhite from '../assets/logo-horizontal-white.svg';
-import logoIconDark from '../assets/logo-icon-dark.svg';
+import { useCommunity } from '../context/CommunityContext';
 
 const Navbar = () => {
   const { t } = useTranslation();
   const { mode, selectMode, clearMode } = useUserMode();
   const { user, isAuthenticated, logout } = useAuth();
+  const { logo, communityName, isInCommunity, exitCommunity } = useCommunity();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -30,6 +30,7 @@ const Navbar = () => {
   };
 
   const navLinks = [
+    ...(!isInCommunity ? [{ label: 'Communities', path: '/communities' }] : []),
     { label: t('nav.discover'), path: '/discover' },
     { label: t('nav.events'), path: '/events' },
     { label: t('nav.media'), path: '/media' },
@@ -42,7 +43,8 @@ const Navbar = () => {
   // Derive mobile navbar title from route
   const getPageTitle = () => {
     const path = location.pathname;
-    if (path === '/' || path === '/feed') return t('pageTitles.biesFeed');
+    if (path === '/' || path === '/feed') return isInCommunity ? communityName : 'Feed';
+    if (path.startsWith('/communities')) return 'Communities';
     if (path.startsWith('/discover')) return t('pageTitles.discover', 'Discover');
     if (path.startsWith('/events')) return t('pageTitles.ecosystemEvents');
     if (path.startsWith('/news')) return t('pageTitles.news');
@@ -64,8 +66,8 @@ const Navbar = () => {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Link to={isAuthenticated ? "/feed" : "/"} className="logo">
-            <img src={logoHorizontalWhite} alt="Nostrbook" className="logo-desktop" style={{ height: '40px' }} />
-            <img src={logoIconDark} alt="Nostrbook" className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
+            <img src={logo.horizontalWhite} alt={communityName} className="logo-desktop" style={{ height: '40px' }} />
+            <img src={logo.icon} alt={communityName} className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
           </Link>
         </div>
 
@@ -171,7 +173,17 @@ const Navbar = () => {
                       )}
                       <Link to="/settings" className="dropdown-item" onClick={() => setIsUserMenuOpen(false)}>{t('nav.settings')}</Link>
                       <Link to="/feedback" className="dropdown-item" onClick={() => setIsUserMenuOpen(false)}>Feedback</Link>
+                      <Link to="/communities" className="dropdown-item" onClick={() => setIsUserMenuOpen(false)}>Communities</Link>
                     </div>
+
+                    {isInCommunity && (
+                      <>
+                        <div className="dropdown-divider"></div>
+                        <button onClick={() => { exitCommunity(); setIsUserMenuOpen(false); navigate('/communities'); }} className="dropdown-item" style={{ color: 'var(--color-secondary)', fontWeight: 600 }}>
+                          Exit {communityName}
+                        </button>
+                      </>
+                    )}
 
                     <div className="dropdown-divider"></div>
 
@@ -224,7 +236,7 @@ const Navbar = () => {
           <div className="mobile-overlay" onClick={() => setIsMenuOpen(false)} />
           <div className="mobile-drawer">
             <div className="mobile-drawer-header">
-              <img src={logoIconDark} alt="Nostrbook" style={{ height: '32px' }} />
+              <img src={logo.icon} alt={communityName} style={{ height: '32px' }} />
               <button onClick={() => setIsMenuOpen(false)} style={{ color: 'white', background: 'none', border: 'none', fontSize: '1.5rem', padding: '8px', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0', display: 'flex', flexDirection: 'column' }}>
@@ -255,6 +267,12 @@ const Navbar = () => {
               })}
             </div>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', padding: '0.5rem 0', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0))' }}>
+              {/* Exit Community button when inside a community */}
+              {isInCommunity && (
+                <button onClick={() => { exitCommunity(); setIsMenuOpen(false); navigate('/communities'); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.9rem 1.5rem', color: '#F59E0B', fontSize: '1rem', fontWeight: 700, background: 'rgba(245,158,11,0.1)', border: 'none', borderLeft: '3px solid #F59E0B', cursor: 'pointer', fontFamily: 'inherit', width: '100%', textAlign: 'left', marginBottom: '0.25rem' }}>
+                  Exit {communityName}
+                </button>
+              )}
               {/* Bottom Section: Feedback, FAQ, Settings, Log Out */}
               {[
                 { to: '/feedback', label: 'Feedback' },
@@ -280,8 +298,8 @@ const Navbar = () => {
         </>
       )}
 
-      {/* Bitcoin Orange Line — bottom box-shadow fills any sub-pixel gap between navbar and page */}
-      <div className="navbar-orange-line" style={{ height: '3px', width: '100%', backgroundColor: 'var(--color-secondary)', flexShrink: 0 }} />
+      {/* Accent Line — community-colored stripe at bottom of navbar */}
+      <div className="navbar-accent-line" style={{ height: '3px', width: '100%', backgroundColor: 'var(--color-secondary)', flexShrink: 0 }} />
 
       {/* Sub-navigation portal target (Dashboard tab bar renders here on mobile) */}
       <div id="navbar-subnav" />

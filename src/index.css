@@ -40,19 +40,21 @@
 }
 
 :root {
-  /* Brand Colors */
-  --color-primary: #0047AB;
-  /* Cobalt Blue */
-  --color-secondary: #FF5B00;
-  /* Blaze Orange */
-  --color-secondary-dark: #CC4A00;
-  --color-neutral-dark: #0A192F;
-  --color-neutral-light: #F8F9FA;
-  --color-primary-dark: #003682;
+  /* Nostrbook Platform Colors (overridden per-community by CommunityContext) */
+  --color-primary: #4F46E5;
+  /* Indigo — trust, productivity */
+  --color-secondary: #F59E0B;
+  /* Amber — warmth, high signal */
+  --color-secondary-dark: #D97706;
+  --color-neutral-dark: #1E1B4B;
+  --color-neutral-light: #FAF9F7;
+  --color-primary-dark: #4338CA;
+  --color-accent: #059669;
+  /* Emerald — growth, community */
 
-  /* Grays */
-  --color-gray-50: #F9F5F4;
-  --color-gray-100: #F1F5F9;
+  /* Grays (warm-toned) */
+  --color-gray-50: #FAFAF8;
+  --color-gray-100: #F3F2EE;
   --color-gray-200: #E2E8F0;
   --color-gray-300: #CBD5E1;
   --color-gray-400: #94A3B8;
@@ -118,9 +120,6 @@
 
 /* Dark Mode Overrides */
 [data-theme="dark"] {
-  --color-primary: #5b9cf6;
-  --color-primary-dark: #3b82f6;
-  --color-primary-nav: #00004E;
 
   --color-gray-50: #0F172A;
   /* Pure dark background */
@@ -490,7 +489,7 @@ textarea {
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(0, 71, 171, 0.1);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
 }
 
 .input-field {
@@ -508,7 +507,7 @@ textarea {
 .input-field:focus {
   background-color: var(--color-gray-100);
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(0, 71, 171, 0.1);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .input-with-icon {
@@ -728,7 +727,7 @@ textarea {
     left: 0;
     right: 0;
     height: env(safe-area-inset-bottom, 0px);
-    background: var(--color-primary-nav, var(--color-primary));
+    background: var(--color-primary);
     z-index: 9999; /* just under the nav's 10000 */
     pointer-events: none;
   }
@@ -797,14 +796,14 @@ textarea {
 [data-theme="dark"] .navbar,
 [data-theme="dark"] .mobile-drawer,
 [data-theme="dark"] .rsvp-btn:not(.going) {
-  background: #00004E !important;
+  background: var(--color-primary-nav, var(--color-primary)) !important;
 }
 
 /* Dark mode: PWA mobile "+" create buttons — Deep Navy with subtle border */
 [data-theme="dark"] .pwa-create-btn,
 [data-theme="dark"] .hide-on-desktop[style*="color-primary"],
 [data-theme="dark"] a.hide-on-desktop {
-  background: #00004E !important;
+  background: var(--color-primary-nav, var(--color-primary)) !important;
   box-shadow: 0 0 0 1px rgba(100, 149, 237, 0.35) !important;
 }
 
