@@ -123,8 +123,8 @@ const VersionIndicator = () => {
                     color: var(--color-gray-200, #E2E8F0);
                 }
                 .version-badge.flash {
-                    color: var(--color-primary, #0047AB);
-                    border-color: var(--color-primary, #0047AB);
+                    color: var(--color-primary, #4F46E5);
+                    border-color: var(--color-primary, #4F46E5);
                 }
             `}</style>
         </>

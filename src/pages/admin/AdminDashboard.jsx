@@ -100,7 +100,7 @@ const AdminDashboard = () => {
                   minWidth: '40px',
                   minHeight: '40px',
                   borderRadius: '50%',
-                  background: active ? (isDark ? '#00004E' : 'var(--color-blue-tint)') : 'var(--color-gray-100)',
+                  background: active ? (isDark ? 'var(--color-primary-nav, #1e1b4b)' : 'var(--color-blue-tint)') : 'var(--color-gray-100)',
                   color: active ? (isDark ? '#ffffff' : 'var(--color-primary)') : 'var(--color-gray-400)',
                   border: active && isDark ? '1px solid rgba(100, 149, 237, 0.35)' : 'none',
                   transition: 'all 0.2s',

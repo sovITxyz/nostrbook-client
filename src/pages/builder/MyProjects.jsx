@@ -361,7 +361,7 @@ const MyProjects = () => {
                     text-decoration: none;
                 }
                 :global([data-theme="dark"]) .project-name-link {
-                    color: #0047AB !important;
+                    color: var(--color-primary) !important;
                 }
                 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
                 .subtitle { color: var(--color-gray-500); }

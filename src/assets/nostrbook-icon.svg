@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="256" cy="256" r="250" fill="#1a1a2e"/>
+  <line x1="160" y1="380" x2="160" y2="130" stroke="#4F46E5" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+  <line x1="160" y1="130" x2="352" y2="380" stroke="#4F46E5" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+  <line x1="352" y1="380" x2="352" y2="130" stroke="#4F46E5" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+  <line x1="160" y1="255" x2="100" y2="200" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <line x1="352" y1="255" x2="412" y2="200" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <line x1="256" y1="255" x2="256" y2="180" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <line x1="160" y1="380" x2="110" y2="420" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <line x1="352" y1="130" x2="400" y2="90" stroke="#4F46E5" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  <circle cx="160" cy="380" r="18" fill="url(#nodeGrad)" filter="url(#glow)"/>
+  <circle cx="160" cy="130" r="18" fill="url(#nodeGrad)" filter="url(#glow)"/>
+  <circle cx="352" cy="380" r="18" fill="url(#nodeGrad)" filter="url(#glow)"/>
+  <circle cx="352" cy="130" r="18" fill="url(#nodeGrad)" filter="url(#glow)"/>
+  <circle cx="100" cy="200" r="8" fill="#4F46E5" opacity="0.4"/>
+  <circle cx="412" cy="200" r="8" fill="#4F46E5" opacity="0.4"/>
+  <circle cx="256" cy="180" r="8" fill="#4F46E5" opacity="0.4"/>
+  <circle cx="110" cy="420" r="8" fill="#4F46E5" opacity="0.4"/>
+  <circle cx="400" cy="90" r="8" fill="#4F46E5" opacity="0.4"/>
+  <circle cx="256" cy="255" r="12" fill="url(#nodeGrad)" filter="url(#glow)"/>
+</svg>

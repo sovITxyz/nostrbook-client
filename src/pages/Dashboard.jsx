@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Folder, CalendarDays, BookOpen, Heart, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Folder, CalendarDays, BookOpen, Heart, MessageSquare, Settings, LogOut, ArrowLeftCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useCommunity } from '../context/CommunityContext';
 
 const Dashboard = () => {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
     const { logout } = useAuth();
     const { theme } = useTheme();
+    const { isInCommunity, activeCommunity, exitCommunity } = useCommunity();
     const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const [portalTarget, setPortalTarget] = useState(null);
 
@@ -57,6 +60,17 @@ const Dashboard = () => {
                     </div>
 
                     <div className="menu-group mt-auto">
+                        {isInCommunity && (
+                            <>
+                                <div className="divider"></div>
+                                <button
+                                    onClick={() => { exitCommunity(); navigate('/communities'); }}
+                                    className="sidebar-link exit-community-btn"
+                                >
+                                    <ArrowLeftCircle size={18} /> <span className="link-label">Exit {activeCommunity?.name}</span>
+                                </button>
+                            </>
+                        )}
                         <div className="divider"></div>
                         <NavLink
                             to="/dashboard/settings"
@@ -107,7 +121,7 @@ const Dashboard = () => {
                                     minWidth: '40px',
                                     minHeight: '40px',
                                     borderRadius: '50%',
-                                    background: active ? (isDark ? '#00004E' : 'var(--color-blue-tint)') : 'var(--color-gray-100)',
+                                    background: active ? (isDark ? 'var(--color-primary-nav, #1e1b4b)' : 'var(--color-blue-tint)') : 'var(--color-gray-100)',
                                     color: active ? (isDark ? '#ffffff' : 'var(--color-primary)') : 'var(--color-gray-400)',
                                     border: active && isDark ? '1px solid rgba(100, 149, 237, 0.35)' : 'none',
                                     transition: 'all 0.2s',
@@ -189,6 +203,8 @@ const Dashboard = () => {
         .desktop-sidebar .sidebar-link.active { background: var(--color-primary); color: white; font-weight: 600; }
         .desktop-sidebar .sidebar-link.text-error { color: var(--color-error); }
         .desktop-sidebar .sidebar-link.text-error:hover { background: var(--color-red-tint); }
+        .desktop-sidebar .exit-community-btn { color: var(--color-secondary); font-weight: 600; }
+        .desktop-sidebar .exit-community-btn:hover { background: var(--color-orange-tint, var(--color-amber-tint)); color: var(--color-secondary-dark); }
 
         .desktop-sidebar .divider { height: 1px; background: var(--color-gray-200); margin: 1rem 0; }
         .desktop-sidebar .mt-auto { margin-top: auto; }

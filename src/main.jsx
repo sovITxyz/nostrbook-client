@@ -26,7 +26,7 @@ class ErrorBoundary extends React.Component {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', background: '#0A192F', color: 'white', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
                     <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Something went wrong</h1>
                     <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '1.5rem' }}>Please try refreshing the page.</p>
-                    <button onClick={() => window.location.reload()} style={{ padding: '0.75rem 2rem', background: '#FF5B00', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>
+                    <button onClick={() => window.location.reload()} style={{ padding: '0.75rem 2rem', background: 'var(--color-secondary, #F59E0B)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer' }}>
                         Refresh
                     </button>
                 </div>

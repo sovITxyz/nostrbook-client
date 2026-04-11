@@ -660,7 +660,7 @@ const Events = () => {
                         <Link to="/events/create" className="pwa-create-btn" title="Create Event" style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             width: 44, height: 44, minWidth: 44, borderRadius: '50%',
-                            background: '#FF5B00', color: 'white', textDecoration: 'none', flexShrink: 0
+                            background: 'var(--color-secondary)', color: 'white', textDecoration: 'none', flexShrink: 0
                         }}>
                             <Plus size={24} strokeWidth={2.5} />
                         </Link>
