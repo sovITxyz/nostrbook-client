@@ -18,7 +18,7 @@ i18n
     },
     detection: {
       order: ['localStorage'],
-      lookupLocalStorage: 'bies_language',
+      lookupLocalStorage: 'nb_language',
       caches: ['localStorage'],
     },
   });

@@ -9,8 +9,8 @@ const VIEW_OPTIONS = [
     { id: 'icon', icon: LayoutGrid, label: 'Icons' },
 ];
 
-const WATCHED_KEY = 'bies_watched_videos';
-const READ_KEY = 'bies_read_substacks';
+const WATCHED_KEY = 'nb_watched_videos';
+const READ_KEY = 'nb_read_substacks';
 function getStoredSet(key) {
     try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch { return new Set(); }
 }
@@ -23,7 +23,7 @@ const Media = () => {
     const [substackItems, setSubstackItems] = useState([]);
     const [youtubeItems, setYoutubeItems] = useState([]);
     const [liveSettings, setLiveSettings] = useState({ livestreamUrl: '', livestreamActive: false });
-    const [viewMode, setViewMode] = useState(() => localStorage.getItem('bies_media_view') || 'card');
+    const [viewMode, setViewMode] = useState(() => localStorage.getItem('nb_media_view') || 'card');
     const [viewMenuOpen, setViewMenuOpen] = useState(false);
     const [playingVideoId, setPlayingVideoId] = useState(null);
     const [loading, setLoading] = useState(false);

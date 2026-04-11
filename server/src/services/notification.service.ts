@@ -4,7 +4,7 @@
  */
 
 import prisma from '../lib/prisma';
-import { sendToUser, isUserOnline } from './websocket.service';
+import { sendToUser } from './websocket.service';
 import { cache, cacheKey, TTL } from './redis.service';
 import { sendPushToUser, isWebPushEnabled } from './webpush.service';
 
@@ -70,12 +70,16 @@ export async function createNotification(params: CreateNotificationParams): Prom
             },
         });
 
-        // If user is offline, try web push as fallback
-        if (!isUserOnline(userId) && isWebPushEnabled()) {
+        // Always attempt web push. The service worker decides whether to
+        // show a system notification based on whether a platform window is
+        // currently focused, so we don't double-notify an active user.
+        // sendPushToUser no-ops for users without subscriptions or with
+        // push disabled in their settings.
+        if (isWebPushEnabled()) {
             sendPushToUser(userId, {
                 title,
                 body,
-                tag: `bies-${type.toLowerCase()}-${notification.id}`,
+                tag: `nostrbook-${type.toLowerCase()}-${notification.id}`,
                 url: getNotificationUrl(type, data),
                 data: { notificationId: notification.id, type },
             }).catch((err) => {

@@ -1,182 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Calendar, MapPin, Clock, Users, Globe, Link as LinkIcon, ShieldCheck, Award, Zap, AlertCircle, Share2, Facebook, Twitter, Mail, Check, MessageSquare, Loader2, Tag, ExternalLink, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Users, Globe, Link as LinkIcon, ShieldCheck, Award, Zap, AlertCircle, Send, Facebook, Twitter, Mail, Check, MessageSquare, Loader2, Tag, ExternalLink, CheckCircle, ChevronLeft, ChevronRight, MoreHorizontal, Copy, UserPlus, X, Search, Flag, CalendarPlus, Navigation, Edit3, Radio } from 'lucide-react';
 import { getAssetUrl } from '../utils/assets';
-import { eventsApi } from '../services/api';
+import { eventsApi, profilesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ZapButton from '../components/ZapButton';
 import DOMPurify from 'dompurify';
 import TranslatableText from '../components/TranslatableText';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label } from 'recharts';
 import { useLightbox } from '../context/LightboxContext';
-
-const MOCK_EVENT_DATA = {
-    'mock-off-1': {
-        id: 'mock-off-1',
-        title: 'Bitcoin & Business Summit El Salvador 2026',
-        category: 'CONFERENCE',
-        isOfficial: true,
-        isOnline: false,
-        organizer: 'Build in El Salvador',
-        startDate: '2026-04-15T09:00:00Z',
-        startTime: '9:00 AM – 6:00 PM CST',
-        location: 'Hotel Decameron, Santa Elena, El Salvador',
-        attendees: 400,
-        description: 'The flagship annual gathering for builders, investors, and entrepreneurs building the Bitcoin economy in El Salvador.',
-        fullDescription: `The Bitcoin & Business Summit El Salvador is the premier annual conference for the Bitcoin - native business ecosystem.This full - day event brings together founders, investors, developers, and policy makers to explore the opportunities being created in El Salvador's rapidly evolving economy.
-
-Featured programming includes keynote presentations from leading Bitcoin entrepreneurs, fireside chats with investors deploying capital in the region, and hands - on workshops covering everything from Lightning Network integration to raising a Bitcoin - native round.
-
-Networking opportunities are woven throughout the day, culminating in an evening reception.Whether you're a builder looking for funding, an investor seeking deal flow, or an ecosystem participant curious about what's being built, this is the event to attend.`,
-        tags: ['Bitcoin', 'El Salvador', 'Investing', 'Networking', 'Conference'],
-        coverImage: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80',
-        externalUrl: 'https://satlantis.io',
-    },
-    'mock-off-2': {
-        id: 'mock-off-2',
-        title: 'Lightning Applications Hackathon',
-        category: 'HACKATHON',
-        isOfficial: true,
-        isOnline: false,
-        organizer: 'Build in El Salvador',
-        startDate: '2026-05-03T10:00:00Z',
-        startTime: '10:00 AM – May 4, 6:00 PM CST',
-        location: 'Chivo Lab, San Salvador, El Salvador',
-        attendees: 120,
-        description: 'A 48-hour hackathon focused on building Lightning Network-powered applications.',
-        fullDescription: `Join us for a 48 - hour build sprint focused entirely on Lightning Network applications.Teams of 1–4 will compete to build the most useful, creative, or technically impressive app that leverages the Lightning Network.
-
-Prize tracks include: Best Consumer App, Best Developer Tool, Best Business Use Case, and a wildcard Best Bitcoin - Native UX prize.Total prize pool: $15,000 in BTC.
-
-Mentors from the community will be available throughout the event to provide technical guidance on Lightning, Nostr integration, and building for the Salvadoran market. Food, coffee, and a hacker lounge will be provided for the full 48 hours.
-
-To participate, register your team in advance.Solo hackers are welcome — we'll help you find a team at the opening session.`,
-        tags: ['Lightning', 'Hackathon', 'Bitcoin', 'Development', 'Prizes'],
-        coverImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&q=80',
-        externalUrl: 'https://satlantis.io',
-    },
-    'mock-off-3': {
-        id: 'mock-off-3',
-        title: 'Investor Demo Day — Spring 2026',
-        category: 'DEMO_DAY',
-        isOfficial: true,
-        isOnline: true,
-        organizer: 'Build in El Salvador',
-        startDate: '2026-05-20T14:00:00Z',
-        startTime: '2:00 PM – 6:00 PM CST',
-        location: 'Virtual & In-Person — San Salvador',
-        attendees: 200,
-        description: 'Top community-vetted startups pitch live to a curated audience of Bitcoin-native investors.',
-        fullDescription: `The Spring Demo Day showcases the most promising startups from across the portfolio and community. Each company gets 5 minutes to pitch, followed by Q&A from an investor panel.
-
-This event is open to investors and ecosystem partners. Attendance is by application only — apply via the link below to be considered. All attendees are verified accredited investors or strategic partners.
-
-The event will be broadcast live online for verified virtual attendees, with full recordings available to community members after the event. In-person attendance includes a cocktail reception and 1:1 meeting matchmaking with founders.
-
-If you're a startup interested in presenting, applications close April 15th.`,
-        tags: ['Demo Day', 'Fundraising', 'Startups', 'Investors', 'Pitching'],
-        coverImage: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80',
-        externalUrl: 'https://satlantis.io',
-    },
-    'mock-com-1': {
-        id: 'mock-com-1',
-        title: 'Bitcoin Builders Meetup — San Salvador',
-        category: 'MEETUP',
-        isOfficial: false,
-        isOnline: false,
-        organizer: 'Community',
-        startDate: '2026-03-18T18:30:00Z',
-        startTime: '6:30 PM – 9:00 PM CST',
-        location: 'La Ventana Café, San Salvador',
-        attendees: 35,
-        description: 'Monthly casual meetup for developers and founders building on Bitcoin.',
-        fullDescription: `The Bitcoin Builders Meetup is a monthly informal gathering for developers, founders, and anyone actively building products on Bitcoin in El Salvador.
-
-The format is casual: show up, grab a drink, and share what you've been working on. Each meetup features 2–3 short "show and tell" presentations from community members (5–10 minutes each), followed by open networking.
-
-This is a low-pressure environment — whether you have a finished product or just a prototype, you're welcome to share. We keep presentations short so there's plenty of time to connect with people one-on-one.
-
-RSVPs are helpful but not required. The venue can accommodate up to ~50 people, so first come first served.`,
-        tags: ['Bitcoin', 'Meetup', 'Networking', 'Builders', 'San Salvador'],
-        coverImage: 'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=1200&q=80',
-        externalUrl: 'https://lu.ma',
-    },
-    'mock-com-2': {
-        id: 'mock-com-2',
-        title: 'Nostr for Builders Workshop',
-        category: 'WORKSHOP',
-        isOfficial: false,
-        isOnline: true,
-        organizer: 'Community',
-        startDate: '2026-03-25T10:00:00Z',
-        startTime: '10:00 AM – 12:00 PM CST',
-        location: 'Online — Zoom',
-        attendees: 80,
-        description: 'Hands-on session covering Nostr protocol basics, key management, and how to integrate Nostr identity into your product.',
-        fullDescription: `This community workshop is designed for developers who want to understand and integrate Nostr into their products. No prior Nostr experience required — just bring a laptop and a working Node.js or Python environment.
-
-We'll cover: the Nostr protocol spec and event model, key management best practices, signing and verifying events, connecting to relays, and practical integration patterns for web and mobile apps.
-
-The second half of the session is hands-on — you'll build a minimal Nostr client that can publish and read events. Code examples will be in JavaScript (nostr-tools) and Python.
-
-Register via Zoom link to receive calendar invite and code repository access.`,
-        tags: ['Nostr', 'Workshop', 'Identity', 'Protocol', 'Development'],
-        coverImage: 'https://images.unsplash.com/photo-1516321165247-4aa89a48be55?w=1200&q=80',
-        externalUrl: 'https://lu.ma',
-    },
-    'mock-com-3': {
-        id: 'mock-com-3',
-        title: 'El Salvador Founders Networking Night',
-        category: 'NETWORKING',
-        isOfficial: false,
-        isOnline: false,
-        organizer: 'Community',
-        startDate: '2026-04-08T19:00:00Z',
-        startTime: '7:00 PM – 10:00 PM CST',
-        location: 'Rooftop Bar La Terraza, Santa Tecla',
-        attendees: 60,
-        description: 'An informal evening for founders building in El Salvador to connect over drinks and explore collaboration opportunities.',
-        fullDescription: `Founders Networking Night is a quarterly social gathering exclusively for founders who are actively building companies in El Salvador. This is a private event — attendance is by invite or RSVP confirmation only.
-
-The format is purely social: no pitches, no panels, no presentations. Just founders connecting with other founders over drinks with a view of the city.
-
-Past attendees have said this is one of the most valuable events in the ecosystem — small enough that you actually meet everyone in the room, and the shared context of building in El Salvador creates instant common ground.
-
-Space is limited to 60 people. RSVP early to secure your spot.`,
-        tags: ['Networking', 'Founders', 'El Salvador', 'Social'],
-        coverImage: 'https://images.unsplash.com/photo-1515169067868-5387ec356754?w=1200&q=80',
-        externalUrl: 'https://lu.ma',
-    },
-    'mock-com-4': {
-        id: 'mock-com-4',
-        title: 'Lightning Payments Deep Dive',
-        category: 'WORKSHOP',
-        isOfficial: false,
-        isOnline: true,
-        organizer: 'Community',
-        startDate: '2026-04-22T17:00:00Z',
-        startTime: '5:00 PM – 7:00 PM CST',
-        location: 'Online — Google Meet',
-        attendees: 55,
-        description: 'Technical walkthrough of Lightning payment flows, BOLT specs, and practical integration patterns for apps targeting the Salvadoran market.',
-        fullDescription: `This deep-dive workshop is for developers who want to get serious about Lightning Network payments. We'll move fast and go deep — this is not a beginner's introduction.
-
-Topics covered: BOLT 11 and BOLT 12 invoice formats, payment routing and pathfinding, handling failures and retries gracefully, managing inbound/outbound liquidity, LSP (Lightning Service Provider) patterns, and using LDK vs LND vs Core Lightning for your use case.
-
-The second hour focuses on practical integration patterns specific to apps targeting El Salvador users: integrating with Chivo, working within the Ley Bitcoin framework, and building for users who may be new to Lightning.
-
-Prerequisite: familiarity with Bitcoin fundamentals and basic programming experience.`,
-        tags: ['Lightning', 'Payments', 'BOLT', 'Technical', 'Workshop'],
-        coverImage: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200&q=80',
-        externalUrl: 'https://lu.ma',
-    },
-};
+import { nostrService } from '../services/nostrService';
+import { nostrSigner } from '../services/nostrSigner';
 
 const EventDetail = () => {
     const { id } = useParams();
     const { t } = useTranslation();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const lightbox = useLightbox();
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -184,6 +24,18 @@ const EventDetail = () => {
     const [rsvpStatus, setRsvpStatus] = useState(null); // null | 'GOING' | 'INTERESTED' | 'NOT_GOING'
     const [rsvpLoading, setRsvpLoading] = useState(false);
     const [showRsvpDropdown, setShowRsvpDropdown] = useState(false);
+    const [showActionMenu, setShowActionMenu] = useState(false);
+    const [showShareMenu, setShowShareMenu] = useState(false);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
+    const [inviteSearch, setInviteSearch] = useState('');
+    const [inviteResults, setInviteResults] = useState([]);
+    const [inviteSearching, setInviteSearching] = useState(false);
+    const [inviteSending, setInviteSending] = useState(null);
+    const [invitedIds, setInvitedIds] = useState(new Set());
+    const [showCoverRsvp, setShowCoverRsvp] = useState(false);
+    const [relayPosting, setRelayPosting] = useState(false);
+    const [relayPostStatus, setRelayPostStatus] = useState(null);
 
     const parseEvent = (data) => {
         if (!data) return data;
@@ -201,14 +53,10 @@ const EventDetail = () => {
     const fetchEvent = async () => {
         setLoading(true);
         try {
-            if (id in MOCK_EVENT_DATA) {
-                setEvent(MOCK_EVENT_DATA[id]);
-            } else {
-                const result = await eventsApi.get(id);
-                const parsed = parseEvent(result);
-                setEvent(parsed);
-                if (parsed?.rsvpStatus) setRsvpStatus(parsed.rsvpStatus);
-            }
+            const result = await eventsApi.get(id);
+            const parsed = parseEvent(result);
+            setEvent(parsed);
+            if (parsed?.rsvpStatus) setRsvpStatus(parsed.rsvpStatus);
         } catch (err) {
             console.error('Error fetching event:', err);
             setError(err.message || 'Failed to load event');
@@ -250,6 +98,171 @@ const EventDetail = () => {
             case 'NOT_GOING': return t('eventDetail.notAttending', 'Not Attending');
             default: return t('eventDetail.rsvp', 'RSVP');
         }
+    };
+
+    // ─── Share: Copy Link ────────────────────────────────────────────────
+    const handleCopyLink = async () => {
+        const url = `${window.location.origin}/events/${id}`;
+        try {
+            await navigator.clipboard.writeText(url);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch {
+            // Fallback for older browsers
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        }
+        setShowShareMenu(false);
+    };
+
+    // ─── Share: Post to Community Relay (NIP-52) ───────────────────────────────
+    const handlePostToRelay = async () => {
+        if (!event || relayPosting) return;
+        if (!nostrSigner.canSignSilently) {
+            alert('Connect a Nostr signer to post to the relay.');
+            return;
+        }
+        setRelayPosting(true);
+        setRelayPostStatus(null);
+        try {
+            const safeTags = (Array.isArray(event.tags) ? event.tags : []).filter(t => typeof t === 'string');
+            await nostrService.publishCalendarEvent({
+                id: event.id,
+                title: event.title,
+                description: event.description,
+                startDate: event.startDate || event.date,
+                endDate: event.endDate,
+                location: event.locationName || event.location,
+                locationAddress: event.locationAddress,
+                isOnline: event.isOnline,
+                onlineUrl: event.onlineUrl,
+                thumbnail: event.thumbnail,
+                ticketUrl: event.ticketUrl,
+                category: event.category,
+                tags: safeTags,
+            }, 'community');
+            setRelayPostStatus('done');
+        } catch (err) {
+            console.error('Failed to post event to community relay:', err);
+            setRelayPostStatus('error');
+        } finally {
+            setRelayPosting(false);
+            setTimeout(() => { setRelayPostStatus(null); setShowShareMenu(false); }, 2000);
+        }
+    };
+
+    // ─── Add to Calendar (.ics download) ──────────────────────────────────
+    const handleAddToCalendar = () => {
+        if (!event) return;
+        const start = new Date(event.startDate || event.date);
+        const end = event.endDate ? new Date(event.endDate) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+        const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+        const esc = (s) => (s || '').replace(/[\\;,]/g, c => '\\' + c).replace(/\n/g, '\\n');
+        const loc = [event.locationName, event.locationAddress, event.location].filter(Boolean).join(', ');
+        const url = `${window.location.origin}/events/${id}`;
+        const ics = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Community//Event//EN',
+            'BEGIN:VEVENT',
+            `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+            `SUMMARY:${esc(event.title)}`, `LOCATION:${esc(loc)}`,
+            `URL:${url}`,
+            `DESCRIPTION:${esc(url)}`,
+            'END:VEVENT', 'END:VCALENDAR',
+        ].join('\r\n');
+        const blob = new Blob([ics], { type: 'text/calendar' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${event.title.replace(/[^a-z0-9]/gi, '-').substring(0, 40)}.ics`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setShowActionMenu(false);
+    };
+
+    // ─── Open in Maps ─────────────────────────────────────────────────────
+    const handleOpenInMaps = () => {
+        const loc = event?.locationMapUrl || event?.locationAddress || event?.location;
+        if (!loc) return;
+        if (event.locationMapUrl) {
+            window.open(event.locationMapUrl, '_blank');
+        } else {
+            window.open(`https://maps.google.com/?q=${encodeURIComponent(loc)}`, '_blank');
+        }
+        setShowActionMenu(false);
+    };
+
+    // ─── Report event ─────────────────────────────────────────────────────
+    const handleReport = () => {
+        const url = `${window.location.origin}/feedback`;
+        window.open(url, '_blank');
+        setShowActionMenu(false);
+    };
+
+    // ─── Invite: Search members ───────────────────────────────────────────
+    const searchMembers = useCallback(async (q) => {
+        if (!q || q.length < 2) { setInviteResults([]); return; }
+        setInviteSearching(true);
+        try {
+            const res = await profilesApi.list({ search: q, limit: 10 });
+            const list = res?.data || res || [];
+            // Filter out the event host and current user
+            setInviteResults(list.filter(p => p.userId !== event?.hostId && p.userId !== user?.id));
+        } catch { setInviteResults([]); }
+        finally { setInviteSearching(false); }
+    }, [event?.hostId, user?.id]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => searchMembers(inviteSearch), 300);
+        return () => clearTimeout(timer);
+    }, [inviteSearch, searchMembers]);
+
+    // ─── Invite: Send invitation ──────────────────────────────────────────
+    const handleInvite = async (profile) => {
+        if (!event || inviteSending) return;
+        const targetUserId = profile.userId;
+        setInviteSending(targetUserId);
+        try {
+            // 1. Backend: create notification + INVITED attendee record
+            await eventsApi.invite(id, targetUserId);
+
+            // 2. Send NIP-17 DM with event link (best-effort, don't block on failure)
+            if (nostrSigner.canSignSilently && profile.user?.nostrPubkey) {
+                const eventUrl = `${window.location.origin}/events/${id}`;
+                const dmContent = `You're invited to "${event.title}"!\n\n${eventUrl}`;
+                nostrService.sendNip17DM(profile.user.nostrPubkey, dmContent).catch(() => {});
+            }
+
+            setInvitedIds(prev => new Set([...prev, targetUserId]));
+        } catch (err) {
+            // Show a user-friendly error if already invited (409) vs generic failure
+            const msg = err?.status === 409 ? 'Already invited' : 'Failed to send invite';
+            // On 409 keep the button disabled (user IS already invited); only revert on real failures
+            if (err?.status !== 409) {
+                setInvitedIds(prev => { const n = new Set(prev); n.delete(targetUserId); return n; });
+            }
+            alert(msg);
+        } finally {
+            setInviteSending(null);
+        }
+    };
+
+    // Close all dropdowns helper
+    const closeAllDropdowns = () => {
+        setShowCoverRsvp(false);
+        setShowShareMenu(false);
+        setShowActionMenu(false);
+    };
+
+    // ─── RSVP icon for cover ──────────────────────────────────────────────
+    const getRsvpIcon = () => {
+        if (rsvpStatus === 'GOING') return <CheckCircle size={18} />;
+        if (rsvpStatus === 'INTERESTED') return <Clock size={18} />;
+        return <Calendar size={18} />;
     };
 
     const formatDate = (dateStr) => {
@@ -311,6 +324,93 @@ const EventDetail = () => {
                     <span className={`category-badge ${(event.category || '').toLowerCase()}`}>
                         {event.category?.replace(/_/g, ' ')}
                     </span>
+
+                    {/* Cover photo action buttons */}
+                    {isAuthenticated && (
+                        <div className="cover-actions">
+                            {/* RSVP icon button */}
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    className={`cover-btn ${rsvpStatus === 'GOING' ? 'going' : rsvpStatus === 'INTERESTED' ? 'interested' : ''}`}
+                                    onClick={() => { const next = !showCoverRsvp; closeAllDropdowns(); setShowCoverRsvp(next); }}
+                                    disabled={rsvpLoading}
+                                    title={getRsvpLabel(rsvpStatus)}
+                                >
+                                    {getRsvpIcon()}
+                                </button>
+                                {showCoverRsvp && (
+                                    <>
+                                        <div className="click-overlay" onClick={() => setShowCoverRsvp(false)} />
+                                        <div className="cover-dropdown">
+                                            <button className="cover-dropdown-item" onClick={() => { handleRsvp('GOING'); setShowCoverRsvp(false); }}>
+                                                <CheckCircle size={14} /> Attending
+                                            </button>
+                                            <button className="cover-dropdown-item" onClick={() => { handleRsvp('INTERESTED'); setShowCoverRsvp(false); }}>
+                                                <Clock size={14} /> Interested
+                                            </button>
+                                            <button className="cover-dropdown-item" style={{ color: 'var(--color-error)' }} onClick={() => { handleRsvp(null); setShowCoverRsvp(false); }}>
+                                                <X size={14} /> Not Going
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Share button */}
+                            <div style={{ position: 'relative' }}>
+                                <button className="cover-btn" onClick={() => { const next = !showShareMenu; closeAllDropdowns(); setShowShareMenu(next); }} title="Share">
+                                    <Send size={18} />
+                                </button>
+                                {showShareMenu && (
+                                    <>
+                                        <div className="click-overlay" onClick={() => setShowShareMenu(false)} />
+                                        <div className="cover-dropdown" style={{ right: 0, left: 'auto', minWidth: '180px' }}>
+                                            <button className="cover-dropdown-item" onClick={handleCopyLink}>
+                                                <Copy size={14} /> {linkCopied ? 'Copied!' : 'Copy Link'}
+                                            </button>
+                                            <button className="cover-dropdown-item" onClick={() => { setShowInviteModal(true); setShowShareMenu(false); }}>
+                                                <UserPlus size={14} /> Invite Members
+                                            </button>
+                                            <button className="cover-dropdown-item" onClick={handlePostToRelay} disabled={relayPosting}>
+                                                {relayPosting ? <Loader2 size={14} className="spin" /> : relayPostStatus === 'done' ? <CheckCircle size={14} style={{ color: 'var(--color-success, #22c55e)' }} /> : relayPostStatus === 'error' ? <AlertCircle size={14} style={{ color: 'var(--color-error)' }} /> : <Radio size={14} />}
+                                                {relayPosting ? 'Posting…' : relayPostStatus === 'done' ? 'Posted!' : relayPostStatus === 'error' ? 'Failed' : 'Post to Community Relay'}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Action menu (...) */}
+                            <div style={{ position: 'relative' }}>
+                                <button className="cover-btn" onClick={() => { const next = !showActionMenu; closeAllDropdowns(); setShowActionMenu(next); }} title="More options">
+                                    <MoreHorizontal size={18} />
+                                </button>
+                                {showActionMenu && (
+                                    <>
+                                        <div className="click-overlay" onClick={() => setShowActionMenu(false)} />
+                                        <div className="cover-dropdown" style={{ right: 0, left: 'auto', minWidth: '200px' }}>
+                                            <button className="cover-dropdown-item" onClick={handleAddToCalendar}>
+                                                <CalendarPlus size={14} /> Add to Calendar
+                                            </button>
+                                            {(event.locationMapUrl || event.locationAddress || event.location) && (
+                                                <button className="cover-dropdown-item" onClick={handleOpenInMaps}>
+                                                    <Navigation size={14} /> Open in Maps
+                                                </button>
+                                            )}
+                                            {user?.id === event.hostId && (
+                                                <button className="cover-dropdown-item" onClick={() => { window.location.href = `/events/edit/${id}`; }}>
+                                                    <Edit3 size={14} /> Edit Event
+                                                </button>
+                                            )}
+                                            <button className="cover-dropdown-item" style={{ color: 'var(--color-error)' }} onClick={handleReport}>
+                                                <Flag size={14} /> Report Event
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="detail-grid">
@@ -344,7 +444,7 @@ const EventDetail = () => {
                                 text={description}
                                 isHtml={true}
                                 className="description rich-text-content"
-                                style={{ color: '#4b5563', fontSize: '0.95rem', lineHeight: 1.75 }}
+                                style={{ color: 'var(--color-gray-700)', fontSize: '0.95rem', lineHeight: 1.75 }}
                             />
                         </div>
 
@@ -528,6 +628,69 @@ const EventDetail = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Invite Members Modal */}
+            {showInviteModal && (
+                <>
+                    <div className="modal-overlay" onClick={() => setShowInviteModal(false)} />
+                    <div className="invite-modal">
+                        <div className="invite-modal-header">
+                            <h3>Invite Members</h3>
+                            <button onClick={() => setShowInviteModal(false)} className="invite-close"><X size={20} /></button>
+                        </div>
+                        <div className="invite-search-wrap">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search members by name..."
+                                value={inviteSearch}
+                                onChange={(e) => setInviteSearch(e.target.value)}
+                                className="invite-search-input"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="invite-results">
+                            {inviteSearching && (
+                                <div className="invite-empty"><Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /></div>
+                            )}
+                            {!inviteSearching && inviteSearch.length >= 2 && inviteResults.length === 0 && (
+                                <div className="invite-empty">No members found</div>
+                            )}
+                            {!inviteSearching && inviteSearch.length < 2 && (
+                                <div className="invite-empty" style={{ color: 'var(--color-gray-400)' }}>Type at least 2 characters to search</div>
+                            )}
+                            {inviteResults.map((profile) => {
+                                const alreadyInvited = invitedIds.has(profile.userId);
+                                const isSending = inviteSending === profile.userId;
+                                return (
+                                    <div key={profile.userId || profile.id} className="invite-row">
+                                        <div className="invite-avatar">
+                                            {profile.avatar ? (
+                                                <img src={getAssetUrl(profile.avatar)} alt="" />
+                                            ) : (
+                                                <span>{(profile.name || '?').charAt(0)}</span>
+                                            )}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
+                                            {profile.title && <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.title}</div>}
+                                        </div>
+                                        <button
+                                            className={`invite-btn ${alreadyInvited ? 'invited' : ''}`}
+                                            onClick={() => !alreadyInvited && handleInvite(profile)}
+                                            disabled={alreadyInvited || isSending}
+                                        >
+                                            {isSending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                                : alreadyInvited ? <><Check size={14} /> Invited</>
+                                                : <><UserPlus size={14} /> Invite</>}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
 
             <style jsx>{`
                 .event-detail-page {
@@ -753,6 +916,194 @@ const EventDetail = () => {
                 }
                 .attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
+                /* Cover action buttons */
+                .cover-actions {
+                    position: absolute;
+                    bottom: 24px;
+                    right: 24px;
+                    z-index: 20;
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+                }
+                .cover-btn {
+                    border-radius: var(--radius-md);
+                    background: var(--color-surface-raised);
+                    color: var(--color-gray-900);
+                    border: 1px solid var(--color-gray-200);
+                    height: 42px;
+                    width: 42px;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: var(--shadow-sm);
+                    transition: all 0.2s;
+                }
+                .cover-btn:hover { background: var(--color-surface-overlay); }
+                .cover-btn.going { background: var(--color-success); color: white; border-color: var(--color-success); }
+                .cover-btn.interested { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+                .cover-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+                .click-overlay {
+                    position: fixed;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    z-index: 30;
+                }
+                .cover-dropdown {
+                    position: absolute;
+                    bottom: calc(100% + 6px);
+                    right: 0;
+                    background: var(--color-surface);
+                    border-radius: 10px;
+                    box-shadow: var(--shadow-lg);
+                    border: 1px solid var(--color-gray-200);
+                    z-index: 31;
+                    overflow: hidden;
+                    min-width: 160px;
+                }
+                .cover-dropdown-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    padding: 0.7rem 1rem;
+                    background: none;
+                    border: none;
+                    border-bottom: 1px solid var(--color-gray-100);
+                    cursor: pointer;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    color: var(--color-text, inherit);
+                    text-align: left;
+                }
+                .cover-dropdown-item:last-child { border-bottom: none; }
+                .cover-dropdown-item:hover { background: var(--color-gray-50); }
+
+                /* Invite modal */
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0.5);
+                    z-index: 200;
+                    animation: fadeIn 0.2s ease-out;
+                }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                .invite-modal {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 90%;
+                    max-width: 440px;
+                    max-height: 70vh;
+                    background: var(--color-surface);
+                    border-radius: 16px;
+                    box-shadow: var(--shadow-lg);
+                    border: 1px solid var(--color-gray-200);
+                    z-index: 201;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .invite-modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1.25rem 1.5rem;
+                    border-bottom: 1px solid var(--color-gray-200);
+                }
+                .invite-modal-header h3 {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    margin: 0;
+                }
+                .invite-close {
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    color: var(--color-gray-500);
+                    padding: 4px;
+                    border-radius: 6px;
+                }
+                .invite-close:hover { color: var(--color-text); background: var(--color-gray-100); }
+                .invite-search-wrap {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 1rem 1.5rem;
+                    padding: 0.6rem 0.75rem;
+                    border: 1px solid var(--color-gray-300);
+                    border-radius: 10px;
+                    color: var(--color-gray-400);
+                    background: var(--color-gray-50);
+                }
+                .invite-search-wrap:focus-within { border-color: var(--color-primary); }
+                .invite-search-input {
+                    flex: 1;
+                    border: none;
+                    outline: none;
+                    font-size: 0.9rem;
+                    background: transparent;
+                    color: var(--color-text, inherit);
+                }
+                .invite-results {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 0 1rem 1rem;
+                }
+                .invite-empty {
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--color-gray-500);
+                    font-size: 0.85rem;
+                }
+                .invite-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.6rem 0.5rem;
+                    border-radius: 8px;
+                    transition: background 0.15s;
+                }
+                .invite-row:hover { background: var(--color-gray-50); }
+                .invite-avatar {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: var(--color-gray-200);
+                    flex-shrink: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    color: var(--color-gray-500);
+                }
+                .invite-avatar img { width: 100%; height: 100%; object-fit: cover; }
+                .invite-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 0.35rem 0.75rem;
+                    border-radius: 8px;
+                    border: 1px solid var(--color-gray-300);
+                    background: var(--color-surface);
+                    color: var(--color-primary);
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    transition: all 0.15s;
+                }
+                .invite-btn:hover:not(:disabled) { background: var(--color-blue-tint); border-color: var(--color-primary); }
+                .invite-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+                .invite-btn.invited { background: var(--color-green-tint); color: var(--color-success); border-color: transparent; }
+
+                @keyframes spin { to { transform: rotate(360deg); } }
+
                 @media (max-width: 768px) {
                     .hero-image { height: 250px; }
                     .detail-grid {
@@ -760,6 +1111,8 @@ const EventDetail = () => {
                     }
                     .info-card { position: static; }
                     .main-content h1 { font-size: 1.5rem; }
+                    .cover-actions { bottom: 12px; right: 12px; gap: 0.4rem; }
+                    .cover-btn { height: 36px; width: 36px; }
                 }
             `}</style>
         </div>

@@ -29,7 +29,7 @@ import {
 } from '@sovit.xyz/keytr';
 import { PUBLIC_RELAYS } from './nostrService.js';
 
-const STORAGE_KEY = 'bies_keytr_credentials';
+const STORAGE_KEY = 'nb_keytr_credentials';
 
 // ─── localStorage credential index ─────────────────────────────────────────
 
@@ -71,10 +71,10 @@ ensureChecked();
 // ─── Legacy migration ───────────────────────────────────────────────────────
 
 (function migrateFromLegacy() {
-    const old = localStorage.getItem('bies_passkey_credentials');
+    const old = localStorage.getItem('nb_passkey_credentials');
     if (old) {
-        localStorage.removeItem('bies_passkey_credentials');
-        localStorage.removeItem('bies_passkey_device_key');
+        localStorage.removeItem('nb_passkey_credentials');
+        localStorage.removeItem('nb_passkey_device_key');
     }
 })();
 
@@ -264,7 +264,7 @@ export const keytrService = {
         }
 
         // Tier 2 — cached user pubkey
-        const raw = localStorage.getItem('bies_user');
+        const raw = localStorage.getItem('nb_user');
         const cached = raw ? JSON.parse(raw) : null;
         if (cached?.nostrPubkey) {
             const events = await fetchKeytrEvents(cached.nostrPubkey, PUBLIC_RELAYS);

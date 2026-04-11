@@ -28,7 +28,7 @@ export function showBrowserNotification(senderName, content, onClick) {
             body: content?.substring(0, 120) || 'You have a new message',
             icon: '/icons/icon-192.png',
             badge: '/icons/icon-192.png',
-            tag: 'bies-dm-' + senderName, // groups per sender
+            tag: 'nb-dm-' + senderName, // groups per sender
             renotify: true,
             silent: true,
         });

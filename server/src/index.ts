@@ -39,6 +39,7 @@ import newsRoutes from './routes/news.routes';
 import mediaRoutes from './routes/media.routes';
 import nip05Routes from './routes/nip05.routes';
 import walletRoutes from './routes/wallet.routes';
+import feedbackRoutes from './routes/feedback.routes';
 
 const app = express();
 
@@ -82,6 +83,10 @@ app.get('/api/version', (_req, res) => {
     res.json({
         version: appVersion,
         environment: config.nodeEnv,
+        commit: process.env.GIT_COMMIT ?? 'unknown',
+        commitShort: process.env.GIT_COMMIT_SHORT ?? 'unknown',
+        branch: process.env.GIT_BRANCH ?? 'unknown',
+        committedAt: process.env.GIT_COMMITTED_AT ?? null,
     });
 });
 
@@ -185,6 +190,7 @@ app.use('/api/content', contentRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -212,6 +218,7 @@ server.listen(config.port, () => {
 ║  Routes: auth | profiles | projects | upload | messages          ║
 ║          notifications | events | analytics | search | admin     ║
 ║          contact | stats | settings | content | news | media     ║
+║          wallet | feedback | websocket                           ║
 ╚══════════════════════════════════════════════════════════════════╝
   `);
 

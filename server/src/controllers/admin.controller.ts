@@ -42,7 +42,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
                     id: true, email: true, nostrPubkey: true, role: true, isAdmin: true,
                     isVerified: true, isBanned: true, createdAt: true,
                     profile: { select: { name: true, avatar: true, company: true } },
-                    _count: { select: { projects: true, investments: true } },
+                    _count: { select: { projects: true } },
                 },
             }),
             prisma.user.count({ where }),
@@ -111,7 +111,7 @@ export async function banUser(req: Request, res: Response): Promise<void> {
 export async function setUserRole(req: Request, res: Response): Promise<void> {
     try {
         const { role } = req.body;
-        if (!['BUILDER', 'INVESTOR', 'MOD', 'MEMBER'].includes(role)) {
+        if (!['MEMBER', 'BUILDER', 'INVESTOR', 'EVENT_HOST', 'EDUCATOR', 'MOD'].includes(role)) {
             res.status(400).json({ error: 'Invalid role' }); return;
         }
 
@@ -144,6 +144,51 @@ export async function setUserRole(req: Request, res: Response): Promise<void> {
     } catch (error) {
         console.error('Set role error:', error);
         res.status(500).json({ error: 'Failed to set user role' });
+    }
+}
+
+/**
+ * PUT /admin/users/:id/admin
+ * Grant or revoke admin access. Only admins can do this.
+ */
+export async function setUserAdmin(req: Request, res: Response): Promise<void> {
+    try {
+        if (!req.user!.isAdmin) {
+            res.status(403).json({ error: 'Only admins can grant or revoke admin access' });
+            return;
+        }
+
+        const { isAdmin } = req.body;
+        if (typeof isAdmin !== 'boolean') {
+            res.status(400).json({ error: 'isAdmin must be a boolean' });
+            return;
+        }
+
+        // Prevent admins from removing their own admin access
+        if (req.params.id === req.user!.id && !isAdmin) {
+            res.status(400).json({ error: 'You cannot remove your own admin access' });
+            return;
+        }
+
+        const user = await prisma.user.update({
+            where: { id: req.params.id },
+            data: { isAdmin },
+            select: { id: true, email: true, nostrPubkey: true, role: true, isAdmin: true },
+        });
+
+        await prisma.auditLog.create({
+            data: {
+                userId: req.user!.id,
+                action: isAdmin ? 'ADMIN_GRANTED' : 'ADMIN_REVOKED',
+                resource: `user:${req.params.id}`,
+                metadata: JSON.stringify({ isAdmin }),
+            },
+        });
+
+        res.json(user);
+    } catch (error) {
+        console.error('Set admin error:', error);
+        res.status(500).json({ error: 'Failed to update admin status' });
     }
 }
 
@@ -569,14 +614,11 @@ export async function syncAccounts(req: Request, res: Response): Promise<void> {
                     profile: true,
                     projects: { select: { id: true } },
                     hostedEvents: { select: { id: true } },
-                    investments: { select: { id: true } },
-                    watchlist: { select: { id: true } },
                     teamMemberships: { select: { id: true } },
                     following: { select: { id: true } },
                     followers: { select: { id: true } },
                     sentMessages: { select: { id: true } },
                     receivedMessages: { select: { id: true } },
-                    deckRequests: { select: { id: true } },
                     eventRSVPs: { select: { id: true } },
                 },
             }),
@@ -647,27 +689,7 @@ export async function syncAccounts(req: Request, res: Response): Promise<void> {
             syncResults.push(`${sourceUser.hostedEvents.length} events transferred`);
         }
 
-        // 4. Transfer investments (skip duplicates)
-        if (sourceUser.investments.length > 0) {
-            const existingInvestments = await prisma.investment.findMany({
-                where: { investorId: targetUserId },
-                select: { projectId: true },
-            });
-            const existingProjectIds = new Set(existingInvestments.map(i => i.projectId));
-
-            const toTransfer = await prisma.investment.findMany({
-                where: { investorId: sourceUserId, projectId: { notIn: Array.from(existingProjectIds) } },
-            });
-            if (toTransfer.length > 0) {
-                await prisma.investment.updateMany({
-                    where: { investorId: sourceUserId, projectId: { notIn: Array.from(existingProjectIds) } },
-                    data: { investorId: targetUserId },
-                });
-            }
-            syncResults.push(`${toTransfer.length} investments transferred`);
-        }
-
-        // 5. Transfer team memberships (skip duplicates)
+        // 4. Transfer team memberships (skip duplicates)
         if (sourceUser.teamMemberships.length > 0) {
             const existingMemberships = await prisma.projectTeamMember.findMany({
                 where: { userId: targetUserId },
@@ -697,22 +719,7 @@ export async function syncAccounts(req: Request, res: Response): Promise<void> {
             syncResults.push('Event RSVPs transferred');
         }
 
-        // 7. Transfer watchlist items (skip duplicates)
-        if (sourceUser.watchlist.length > 0) {
-            const existingWatch = await prisma.watchlistItem.findMany({
-                where: { userId: targetUserId },
-                select: { projectId: true },
-            });
-            const existingWatchProjIds = new Set(existingWatch.map(w => w.projectId));
-
-            await prisma.watchlistItem.updateMany({
-                where: { userId: sourceUserId, projectId: { notIn: Array.from(existingWatchProjIds) } },
-                data: { userId: targetUserId },
-            });
-            syncResults.push('Watchlist items transferred');
-        }
-
-        // 8. Transfer follows (skip duplicates)
+        // 7. Transfer follows (skip duplicates)
         if (sourceUser.following.length > 0) {
             const existingFollowing = await prisma.follow.findMany({
                 where: { followerId: targetUserId },
@@ -865,106 +872,6 @@ export async function listAdminProjects(req: Request, res: Response): Promise<vo
     } catch (error) {
         console.error('Admin list projects error:', error);
         res.status(500).json({ error: 'Failed to list projects' });
-    }
-}
-
-// ─── Investor Requests ────────────────────────────────────────────────────────
-
-/**
- * GET /admin/investor-requests
- * List pending investor requests.
- */
-export async function listInvestorRequests(req: Request, res: Response): Promise<void> {
-    try {
-        if (!req.user!.isAdmin) {
-            res.status(403).json({ error: 'Only admins can view investor requests' }); return;
-        }
-        const requests = await prisma.investorRequest.findMany({
-            where: { status: 'PENDING' },
-            include: {
-                user: {
-                    select: {
-                        id: true, email: true,
-                        profile: { select: { name: true, company: true } },
-                    }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-        res.json(requests);
-    } catch (error) {
-        console.error('List investor requests error:', error);
-        res.status(500).json({ error: 'Failed to list investor requests' });
-    }
-}
-
-/**
- * PUT /admin/investor-requests/:id
- * Approve or deny an investor request.
- */
-export async function reviewInvestorRequest(req: Request, res: Response): Promise<void> {
-    try {
-        if (!req.user!.isAdmin) {
-            res.status(403).json({ error: 'Only admins can review investor requests' }); return;
-        }
-
-        const { status } = req.body;
-        if (!['APPROVED', 'DENIED'].includes(status)) {
-            res.status(400).json({ error: 'Status must be APPROVED or DENIED' }); return;
-        }
-
-        const request = await prisma.investorRequest.findUnique({
-            where: { id: req.params.id }
-        });
-
-        if (!request) {
-            res.status(404).json({ error: 'Request not found' }); return;
-        }
-
-        if (request.status !== 'PENDING') {
-            res.status(400).json({ error: 'Request is already processed' }); return;
-        }
-
-        if (status === 'APPROVED') {
-            await prisma.$transaction([
-                prisma.investorRequest.update({
-                    where: { id: request.id },
-                    data: { status: 'APPROVED', reviewedAt: new Date() }
-                }),
-                prisma.user.update({
-                    where: { id: request.userId },
-                    data: { role: 'INVESTOR' }
-                }),
-                prisma.auditLog.create({
-                    data: {
-                        userId: req.user!.id,
-                        action: 'INVESTOR_REQUEST_APPROVED',
-                        resource: `user:${request.userId}`,
-                        metadata: JSON.stringify({ requestId: request.id }),
-                    }
-                })
-            ]);
-        } else {
-            await prisma.$transaction([
-                prisma.investorRequest.update({
-                    where: { id: request.id },
-                    data: { status: 'DENIED', reviewedAt: new Date() }
-                }),
-                prisma.auditLog.create({
-                    data: {
-                        userId: req.user!.id,
-                        action: 'INVESTOR_REQUEST_DENIED',
-                        resource: `user:${request.userId}`,
-                        metadata: JSON.stringify({ requestId: request.id }),
-                    }
-                })
-            ]);
-        }
-
-        res.json({ message: `Request ${status.toLowerCase()}` });
-    } catch (error) {
-        console.error('Review investor request error:', error);
-        res.status(500).json({ error: 'Failed to review investor request' });
     }
 }
 

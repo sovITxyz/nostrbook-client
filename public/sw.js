@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bies-v2';
+const CACHE_NAME = 'nostrbook-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -54,7 +54,7 @@ self.addEventListener('fetch', (event) => {
 // ─── Push notifications (PWA background messages) ─────────────────────────
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'BIES', body: 'You have a new notification' };
+  let data = { title: 'Nostrbook', body: 'You have a new notification' };
   try {
     if (event.data) data = Object.assign(data, event.data.json());
   } catch { /* use defaults */ }
@@ -63,7 +63,7 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: data.tag || 'bies-notification',
+    tag: data.tag || 'nostrbook-notification',
     renotify: true,
     vibrate: [80, 40, 80],
     data: {
@@ -73,8 +73,19 @@ self.addEventListener('push', (event) => {
     },
   };
 
+  // Suppress the OS notification when the user is actively looking at a
+  // app window — the in-app WS handler already shows the notification in
+  // the UI, so firing a system push too would be a duplicate.
+  // "Actively looking at" = at least one client window is both visible
+  // AND focused. Background tabs / minimised PWAs still get the push.
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const hasFocusedClient = clients.some(
+        (c) => c.visibilityState === 'visible' && c.focused === true
+      );
+      if (hasFocusedClient) return; // skip — user is already seeing it in-app
+      return self.registration.showNotification(data.title, options);
+    })
   );
 });
 
@@ -85,7 +96,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // Focus an existing BIES tab if open
+      // Focus an existing Nostrbook tab if open
       for (const client of clients) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           if ('navigate' in client) client.navigate(url);

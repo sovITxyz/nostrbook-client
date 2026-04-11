@@ -62,6 +62,11 @@ const CreateEvent = () => {
     const [tags, setTags] = useState([]);
     const [customSections, setCustomSections] = useState([]);
     const [relayHealth, setRelayHealth] = useState(null);
+    const [showImport, setShowImport] = useState(false);
+    const [importUrl, setImportUrl] = useState('');
+    const [importLoading, setImportLoading] = useState(false);
+    const [importError, setImportError] = useState('');
+    const [importPlatform, setImportPlatform] = useState('');
 
     useEffect(() => {
         if (form.visibility !== 'DRAFT' && form.visibility !== 'PRIVATE' && form.nostrPublish !== 'none') {
@@ -74,6 +79,39 @@ const CreateEvent = () => {
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+
+    const handleImportUrl = async () => {
+        if (!importUrl.trim()) return;
+        setImportError('');
+        setImportLoading(true);
+        try {
+            const data = await eventsApi.importUrl(importUrl.trim());
+            // Auto-fill form fields with imported data
+            setForm(prev => ({
+                ...prev,
+                ...(data.title && { title: data.title }),
+                ...(data.description && { description: data.description }),
+                ...(data.startDate && { startDate: data.startDate }),
+                ...(data.startTime && { startTime: data.startTime }),
+                ...(data.endDate && { endDate: data.endDate }),
+                ...(data.endTime && { endTime: data.endTime }),
+                ...(data.locationName && { locationName: data.locationName }),
+                ...(data.locationAddress && { locationAddress: data.locationAddress }),
+                ...(data.isOnline !== undefined && { isOnline: data.isOnline }),
+                ...(data.onlineUrl && { onlineUrl: data.onlineUrl }),
+                ...(data.ticketUrl && { ticketUrl: data.ticketUrl }),
+                ...(data.maxAttendees && { maxAttendees: String(data.maxAttendees) }),
+                ...(data.thumbnail && { thumbnail: data.thumbnail }),
+            }));
+            if (data.platform) setImportPlatform(data.platform);
+            setShowImport(false);
+            setImportUrl('');
+        } catch (err) {
+            setImportError(err.message || 'Failed to import event data');
+        } finally {
+            setImportLoading(false);
+        }
     };
 
     const handleImageUpload = async (e) => {
@@ -350,6 +388,55 @@ const CreateEvent = () => {
                     </div>
                 </div>
 
+                {/* Import from URL */}
+                <div className="import-section">
+                    {!showImport ? (
+                        <button className="import-toggle" onClick={() => setShowImport(true)}>
+                            <LinkIcon size={16} /> Import from URL
+                            <span className="import-hint">Luma, Satlantis, Eventbrite, Meetup, and more</span>
+                        </button>
+                    ) : (
+                        <div className="import-card">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Import Event from URL</span>
+                                <button onClick={() => { setShowImport(false); setImportError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-gray-400)', padding: '4px' }}><X size={18} /></button>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)', marginBottom: '0.75rem' }}>
+                                Paste a link from Luma, Satlantis, Eventbrite, Meetup, or any event page. We'll auto-fill the form with the event details.
+                            </p>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                    type="url"
+                                    placeholder="https://lu.ma/your-event or any event URL..."
+                                    value={importUrl}
+                                    onChange={(e) => setImportUrl(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleImportUrl()}
+                                    className="input-field"
+                                    style={{ flex: 1 }}
+                                    disabled={importLoading}
+                                />
+                                <button
+                                    onClick={handleImportUrl}
+                                    disabled={importLoading || !importUrl.trim()}
+                                    className="import-btn"
+                                >
+                                    {importLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={16} />}
+                                    {importLoading ? 'Importing...' : 'Import'}
+                                </button>
+                            </div>
+                            {importError && (
+                                <p style={{ color: 'var(--color-error)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{importError}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {importPlatform && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', background: 'var(--color-green-tint)', color: 'var(--color-success, #16a34a)', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem', fontWeight: 500 }}>
+                        Imported from {importPlatform.charAt(0).toUpperCase() + importPlatform.slice(1)} — review and adjust the details below
+                    </div>
+                )}
+
                 {submitError && (
                     <div className="error-banner"><AlertCircle size={16} /> {submitError}</div>
                 )}
@@ -361,7 +448,7 @@ const CreateEvent = () => {
                         {nostrStatus === 'failed' && <AlertCircle size={16} />}
                         {nostrStatus === 'publishing' && 'Publishing to Nostr relays...'}
                         {nostrStatus === 'success' && 'Published to Nostr as NIP-52 calendar event'}
-                        {nostrStatus === 'failed' && 'Failed to publish to Nostr — event saved locally'}
+                        {nostrStatus === 'failed' && 'Failed to publish to Nostr — event saved to platform only'}
                     </div>
                 )}
 
@@ -665,7 +752,48 @@ const CreateEvent = () => {
                 .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
                 .mb-8 { margin-bottom: 2rem; }
                 .max-w-6xl { max-width: 1200px; margin: 0 auto; }
-                .page-header { margin-bottom: 2rem; }
+                .page-header { margin-bottom: 1rem; }
+                .import-section { margin-bottom: 1.5rem; }
+                .import-toggle {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.6rem 1.25rem;
+                    border: 2px dashed var(--color-gray-300);
+                    border-radius: 10px;
+                    background: none;
+                    color: var(--color-primary);
+                    font-weight: 600;
+                    font-size: 0.88rem;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+                .import-toggle:hover { border-color: var(--color-primary); background: var(--color-blue-tint); }
+                .import-hint { font-weight: 400; font-size: 0.75rem; color: var(--color-gray-400); }
+                .import-card {
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-gray-200);
+                    border-radius: 12px;
+                    padding: 1.25rem;
+                    box-shadow: var(--shadow-sm);
+                }
+                .import-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    padding: 0.75rem 1.25rem;
+                    background: var(--color-primary);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.88rem;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    transition: opacity 0.15s;
+                }
+                .import-btn:hover { opacity: 0.9; }
+                .import-btn:disabled { opacity: 0.5; cursor: not-allowed; }
                 .back-link { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--color-gray-500); font-weight: 500; font-size: 0.9rem; background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 0.75rem; }
                 .back-link:hover { color: var(--color-primary); }
                 .h1-title { font-size: 2rem; font-weight: 700; font-family: var(--font-display); margin-bottom: 0.25rem; }

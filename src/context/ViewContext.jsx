@@ -4,11 +4,11 @@ const ViewContext = createContext();
 
 export const ViewProvider = ({ children }) => {
     const [defaultView, setDefaultView] = useState(() => {
-        return localStorage.getItem('bies_default_view') || 'list';
+        return localStorage.getItem('nb_default_view') || 'list';
     });
 
     useEffect(() => {
-        localStorage.setItem('bies_default_view', defaultView);
+        localStorage.setItem('nb_default_view', defaultView);
     }, [defaultView]);
 
     return (

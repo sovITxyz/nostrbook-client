@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/authService';
-import { BiesWebSocket, notificationsApi, profilesApi } from '../services/api';
-import { nostrService } from '../services/nostrService';
+import { NbWebSocket, notificationsApi, profilesApi } from '../services/api';
+import { nostrService, PUBLIC_RELAYS } from '../services/nostrService';
 import { notifyIncomingMessage, subscribeToPush } from '../utils/notificationManager';
 import { nostrSigner } from '../services/nostrSigner';
 import { keytrService } from '../services/keytrService';
 import { PASSKEY_ENABLED } from '../config/featureFlags';
 import PasskeySavePrompt from '../components/PasskeySavePrompt';
+import PushPermissionPrompt from '../components/PushPermissionPrompt';
 
 const AuthContext = createContext();
 
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
+    const [showPushPrompt, setShowPushPrompt] = useState(false);
 
     // ─── Passkey save prompt ─────────────────────────────────────────────────
 
@@ -70,33 +72,55 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setWsClient((prev) => { prev?.disconnect(); return null; });
         };
-        window.addEventListener('bies:unauthorized', handleUnauthorized);
+        window.addEventListener('nb:unauthorized', handleUnauthorized);
 
         return () => {
             mounted = false;
-            window.removeEventListener('bies:unauthorized', handleUnauthorized);
+            window.removeEventListener('nb:unauthorized', handleUnauthorized);
         };
     }, []);
 
-    // ─── Push subscription (silent, no prompt) ─────────────────────────────
+    // ─── Push subscription ─────────────────────────────────────────────────
+    //
+    // Three cases after login:
+    //   1. Permission already granted — silently (re)subscribe, no UI.
+    //   2. Permission default (never asked) — show the non-blocking banner
+    //      so the user can enable it with a click (required by browsers;
+    //      Notification.requestPermission() needs a user gesture).
+    //   3. Permission denied — do nothing; respect the user's choice.
+    //
+    // The banner is sessionStorage-gated so it only shows once per session.
 
     const initPushSubscription = useCallback(async () => {
-        if (!('Notification' in window) || Notification.permission !== 'granted') return;
-        if (!('PushManager' in window)) return;
-        try {
-            const { publicKey } = await notificationsApi.getVapidKey();
-            if (!publicKey) return;
-            const subscription = await subscribeToPush(publicKey);
-            if (subscription) await notificationsApi.pushSubscribe(subscription);
-        } catch {
-            // Push is best-effort — silent failure
+        if (!('Notification' in window) || !('PushManager' in window)) return;
+
+        if (Notification.permission === 'granted') {
+            try {
+                const { publicKey } = await notificationsApi.getVapidKey();
+                if (!publicKey) return;
+                const subscription = await subscribeToPush(publicKey);
+                if (subscription) await notificationsApi.pushSubscribe(subscription);
+            } catch {
+                // Push is best-effort — silent failure
+            }
+            return;
         }
+
+        if (Notification.permission === 'default') {
+            if (sessionStorage.getItem('nb_push_prompt_dismissed')) return;
+            setShowPushPrompt(true);
+        }
+    }, []);
+
+    const dismissPushPrompt = useCallback(() => {
+        sessionStorage.setItem('nb_push_prompt_dismissed', '1');
+        setShowPushPrompt(false);
     }, []);
 
     // ─── WebSocket setup ───────────────────────────────────────────────────
 
     const initWebSocket = useCallback((user) => {
-        const ws = new BiesWebSocket(
+        const ws = new NbWebSocket(
             // onMessage
             (msg) => {
                 if (msg.type === 'notification') {
@@ -122,7 +146,8 @@ export const AuthProvider = ({ children }) => {
         ws.connect();
         setWsClient(ws);
 
-        // Silently register push subscription if permission already granted
+        // Subscribe silently if permission is granted, or show the enable
+        // banner once per session if permission is still default.
         initPushSubscription();
 
         return ws;
@@ -287,13 +312,16 @@ export const AuthProvider = ({ children }) => {
     };
 
     /**
-     * Fetch the user's Kind 0 profile from public Nostr relays
-     * and update the platform profile with any available fields
-     * (name, avatar, banner, bio, website).
+     * Fetch the user's Kind 0 profile from public Nostr relays (Primal, Damus, etc.)
+     * and apply it to both the platform API profile and the community relay (kind:0).
+     * This ensures the user's name/avatar from their existing Nostr identity
+     * shows up on the platform before they manually set it.
      */
     const seedProfileFromNostr = async (pubkey) => {
         try {
-            const nostrProfile = await nostrService.getProfile(pubkey);
+            // Explicitly fetch from public relays (Primal, Damus, etc.) since
+            // this is a new user whose profile won't be on the community relay yet
+            const nostrProfile = await nostrService.getProfile(pubkey, PUBLIC_RELAYS);
             if (!nostrProfile) return;
 
             const updates = {};
@@ -306,7 +334,16 @@ export const AuthProvider = ({ children }) => {
             if (nostrProfile.website) updates.website = nostrProfile.website;
 
             if (Object.keys(updates).length > 0) {
+                // Update the platform backend profile (API)
                 await profilesApi.update(updates);
+
+                // Publish the kind:0 to the community relay so the name is visible
+                // to other users on the relay before the user edits their profile
+                try {
+                    await nostrService.updateProfileToCommunityRelay(nostrProfile);
+                } catch (relayErr) {
+                    console.warn('[Auth] Failed to publish profile to community relay:', relayErr);
+                }
             }
         } catch (err) {
             console.error('[Auth] Failed to seed profile from Nostr:', err);
@@ -383,6 +420,9 @@ export const AuthProvider = ({ children }) => {
                     onClose={dismissPasskeyPrompt}
                     onSaved={handlePasskeySaved}
                 />
+            )}
+            {showPushPrompt && !showPasskeyPrompt && (
+                <PushPermissionPrompt onClose={dismissPushPrompt} />
             )}
         </AuthContext.Provider>
     );

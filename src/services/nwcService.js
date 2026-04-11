@@ -11,7 +11,7 @@
 import { SimplePool, finalizeEvent, getPublicKey } from 'nostr-tools';
 import { encrypt as nip04Encrypt, decrypt as nip04Decrypt } from 'nostr-tools/nip04';
 
-const NWC_STORAGE_KEY = 'bies_nwc_uri';
+const NWC_STORAGE_KEY = 'nb_nwc_uri';
 const REQUEST_TIMEOUT_MS = 15_000;
 const RELAY_CONNECT_TIMEOUT_MS = 5_000;
 

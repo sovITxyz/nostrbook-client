@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { nostrService } from '../services/nostrService';
+import { nostrService, PUBLIC_RELAYS } from '../services/nostrService';
 import { nip19 } from 'nostr-tools';
 import { profilesApi } from '../services/api';
 import { ArrowRight, Loader2, AlertCircle, ChevronDown, ChevronUp, Send, AtSign, CheckCircle, X } from 'lucide-react';
@@ -30,9 +30,9 @@ const ProfileSetup = () => {
             return;
         }
 
-        // Fetch Nostr kind:0 profile from public relays
+        // Fetch Nostr kind:0 profile from public relays (new user won't have one on community relay yet)
         if (user?.nostrPubkey) {
-            nostrService.getProfile(user.nostrPubkey).then((profile) => {
+            nostrService.getProfile(user.nostrPubkey, PUBLIC_RELAYS).then((profile) => {
                 setNostrProfile(profile);
                 if (profile?.name) {
                     setBiesName(profile.name);
@@ -46,6 +46,10 @@ const ProfileSetup = () => {
                         nip05: profile.nip05 || '',
                         lud16: profile.lud16 || '',
                     });
+                }
+                // Auto-fill NIP-05 when user has no existing NIP-05
+                if (!profile?.nip05 && user?.profile?.nip05Name) {
+                    setNip05Name(user.profile.nip05Name);
                 }
             }).finally(() => setLoadingNostr(false));
         } else {
@@ -104,6 +108,10 @@ const ProfileSetup = () => {
                 else if (nostrForm.nip05) data.nip05 = nostrForm.nip05;
                 if (nostrForm.lud16) data.lud16 = nostrForm.lud16;
                 if (showNostrEdit && nostrForm.name) {
+                    // User edited Nostr profile — publish to all relays
+                    await nostrService.updateProfile(data);
+                } else if (nip05Name.trim() && !nostrProfile?.nip05) {
+                    // User had no NIP-05, got community identity — publish to public relays so it's verifiable
                     await nostrService.updateProfile(data);
                 } else {
                     await nostrService.updateProfileToCommunityRelay(data);
@@ -221,13 +229,39 @@ const ProfileSetup = () => {
                                     style={{ opacity: 0.7, cursor: 'default' }}
                                 />
                                 <p className="text-xs text-gray-400 mt-1">
-                                    You can set an identity later in profile settings.
+                                    You already have a NIP-05 identity. You can also claim a <strong>@{import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}</strong> identity below.
                                 </p>
+                                <div style={{ marginTop: '0.75rem' }}>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                        Claim your community identity (optional)
+                                    </label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                                        <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                            <AtSign size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-gray-400)' }} />
+                                            <input
+                                                type="text"
+                                                className="w-full p-3 border rounded-lg input-field"
+                                                style={{ paddingLeft: '2.25rem' }}
+                                                placeholder="alice"
+                                                value={nip05Name}
+                                                onChange={e => setNip05Name(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                                            />
+                                        </div>
+                                        {nip05Checking && <Loader2 size={16} className="spin" style={{ color: 'var(--color-gray-400)' }} />}
+                                        {!nip05Checking && nip05Available === true && <CheckCircle size={16} style={{ color: '#16a34a' }} />}
+                                        {!nip05Checking && nip05Available === false && <X size={16} style={{ color: '#ef4444' }} />}
+                                    </div>
+                                    {nip05Name && (
+                                        <p className="text-xs mt-1" style={{ color: nip05Available === false ? '#ef4444' : 'var(--color-gray-400)' }}>
+                                            {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Choose your identity
+                                    Your Community Identity
                                 </label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                                     <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -250,6 +284,9 @@ const ProfileSetup = () => {
                                         {nip05Available === false ? 'Taken — try another name' : `${nip05Name.toLowerCase()}@${import.meta.env.VITE_NIP05_DOMAIN || 'nostrbook.app'}`}
                                     </p>
                                 )}
+                                <p className="text-xs text-gray-400 mt-1">
+                                    We've assigned you a community identity. You can customize it above.
+                                </p>
                             </div>
                         )
                     )}
