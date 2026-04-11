@@ -953,14 +953,14 @@ const Feed = () => {
 
     // Mute a user — add to local mute set (stored in localStorage)
     const [mutedUsers, setMutedUsers] = useState(() => {
-        try { return new Set(JSON.parse(localStorage.getItem('bies_muted_users') || '[]')); }
+        try { return new Set(JSON.parse(localStorage.getItem('nb_muted_users') || '[]')); }
         catch { return new Set(); }
     });
 
     const handleMuteUser = (pubkey) => {
         setMutedUsers(prev => {
             const next = new Set(prev).add(pubkey);
-            localStorage.setItem('bies_muted_users', JSON.stringify([...next]));
+            localStorage.setItem('nb_muted_users', JSON.stringify([...next]));
             return next;
         });
     };

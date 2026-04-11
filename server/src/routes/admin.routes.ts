@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth';
+import { adminFeedbackRouter } from './feedback.routes';
 import {
     listUsers,
     banUser,
     setUserRole,
+    setUserAdmin,
     verifyUser,
     deleteUser,
     listTrashedUsers,
@@ -20,8 +22,6 @@ import {
     getAuditLogs,
     broadcastMessage,
     clearCache,
-    listInvestorRequests,
-    reviewInvestorRequest,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -34,6 +34,7 @@ router.get('/users', listUsers);
 router.get('/users/trash', listTrashedUsers);           // ADMIN only (enforced in controller)
 router.put('/users/:id/ban', banUser);
 router.put('/users/:id/role', setUserRole);
+router.put('/users/:id/admin', setUserAdmin);
 router.put('/users/:id/verify', verifyUser);
 router.put('/users/:id/restore', restoreUser);          // ADMIN only (enforced in controller)
 router.delete('/users/:id', deleteUser);                // ADMIN only (enforced in controller)
@@ -41,9 +42,6 @@ router.delete('/users/:id/purge', purgeUser);           // ADMIN only (enforced 
 router.post('/users/sync', syncAccounts);               // ADMIN only (enforced in controller)
 
 // Projects
-router.get('/investor-requests', listInvestorRequests);
-router.put('/investor-requests/:id/review', reviewInvestorRequest);
-
 router.get('/projects', listAdminProjects);
 router.put('/projects/:id/feature', featureProject);
 router.put('/projects/:id/review', reviewProject);
@@ -58,5 +56,8 @@ router.put('/events/:id/feature', featureEvent);
 router.get('/audit-logs', getAuditLogs);
 router.post('/broadcast', broadcastMessage);
 router.post('/cache/clear', clearCache);
+
+// Feedback
+router.use('/feedback', adminFeedbackRouter);
 
 export default router;

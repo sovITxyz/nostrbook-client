@@ -4,7 +4,7 @@ const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
     const [theme, setTheme] = useState(() => {
-        return localStorage.getItem('bies_theme') || 'system';
+        return localStorage.getItem('nb_theme') || 'system';
     });
 
     useEffect(() => {
@@ -27,7 +27,7 @@ export const ThemeProvider = ({ children }) => {
         };
 
         applyTheme(theme);
-        localStorage.setItem('bies_theme', theme);
+        localStorage.setItem('nb_theme', theme);
 
         // Listen for system changes if set to 'system'
         if (theme === 'system') {

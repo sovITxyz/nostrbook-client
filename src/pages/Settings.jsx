@@ -15,27 +15,27 @@ import { PASSKEY_ENABLED } from '../config/featureFlags';
 const Settings = () => {
     const { theme, setTheme } = useTheme();
     const { defaultView, setDefaultView } = useViewPreference();
-    const [projectsView, setProjectsView] = useState(() => localStorage.getItem('bies_projects_view') || defaultView || 'list');
-    const [membersView, setMembersView] = useState(() => localStorage.getItem('bies_members_view') || defaultView || 'list');
-    const [eventsView, setEventsView] = useState(() => localStorage.getItem('bies_events_view') || defaultView || 'list');
-    const [mediaView, setMediaView] = useState(() => localStorage.getItem('bies_media_view') || 'card');
+    const [projectsView, setProjectsView] = useState(() => localStorage.getItem('nb_projects_view') || defaultView || 'list');
+    const [membersView, setMembersView] = useState(() => localStorage.getItem('nb_members_view') || defaultView || 'list');
+    const [eventsView, setEventsView] = useState(() => localStorage.getItem('nb_events_view') || defaultView || 'list');
+    const [mediaView, setMediaView] = useState(() => localStorage.getItem('nb_media_view') || 'card');
 
     // Load preferences from backend on mount (restores after logout/login)
     useEffect(() => {
         preferencesApi.get().then(prefs => {
             if (prefs.theme && prefs.theme !== theme) setTheme(prefs.theme);
             if (prefs.language && prefs.language !== i18n.language) i18n.changeLanguage(prefs.language);
-            if (prefs.projectsView) { setProjectsView(prefs.projectsView); localStorage.setItem('bies_projects_view', prefs.projectsView); setDefaultView(prefs.projectsView); }
-            if (prefs.membersView) { setMembersView(prefs.membersView); localStorage.setItem('bies_members_view', prefs.membersView); }
-            if (prefs.eventsView) { setEventsView(prefs.eventsView); localStorage.setItem('bies_events_view', prefs.eventsView); }
-            if (prefs.mediaView) { setMediaView(prefs.mediaView); localStorage.setItem('bies_media_view', prefs.mediaView); }
+            if (prefs.projectsView) { setProjectsView(prefs.projectsView); localStorage.setItem('nb_projects_view', prefs.projectsView); setDefaultView(prefs.projectsView); }
+            if (prefs.membersView) { setMembersView(prefs.membersView); localStorage.setItem('nb_members_view', prefs.membersView); }
+            if (prefs.eventsView) { setEventsView(prefs.eventsView); localStorage.setItem('nb_events_view', prefs.eventsView); }
+            if (prefs.mediaView) { setMediaView(prefs.mediaView); localStorage.setItem('nb_media_view', prefs.mediaView); }
         }).catch(() => {});
     }, []);
 
     // Save a preference to both localStorage and backend
     const savePref = useCallback((key, value) => {
         localStorage.setItem(key, value);
-        const prefKey = key.replace('bies_', '').replace(/_([a-z])/g, (_, c) => c.toUpperCase()); // bies_projects_view → projectsView
+        const prefKey = key.replace('nb_', '').replace(/_([a-z])/g, (_, c) => c.toUpperCase()); // nb_projects_view → projectsView
         preferencesApi.save({ [prefKey]: value }).catch(() => {});
     }, []);
 
@@ -43,7 +43,7 @@ const Settings = () => {
         const v = e.target.value;
         setter(v);
         savePref(key, v);
-        if (key === 'bies_projects_view') setDefaultView(v);
+        if (key === 'nb_projects_view') setDefaultView(v);
     };
     const { t, i18n } = useTranslation();
 
@@ -280,7 +280,7 @@ const Settings = () => {
                             <p className="setting-desc">Default layout for the Discover projects page</p>
                         </div>
                     </div>
-                    <select className="select-input" value={projectsView} onChange={handleViewChange('bies_projects_view', setProjectsView)}>
+                    <select className="select-input" value={projectsView} onChange={handleViewChange('nb_projects_view', setProjectsView)}>
                         <option value="list">List</option>
                         <option value="standard">Grid</option>
                     </select>
@@ -293,7 +293,7 @@ const Settings = () => {
                             <p className="setting-desc">Default layout for the Discover members page</p>
                         </div>
                     </div>
-                    <select className="select-input" value={membersView} onChange={handleViewChange('bies_members_view', setMembersView)}>
+                    <select className="select-input" value={membersView} onChange={handleViewChange('nb_members_view', setMembersView)}>
                         <option value="list">List</option>
                         <option value="standard">Cards</option>
                         <option value="icons">Icons</option>
@@ -307,7 +307,7 @@ const Settings = () => {
                             <p className="setting-desc">Default layout for the Events page</p>
                         </div>
                     </div>
-                    <select className="select-input" value={eventsView} onChange={handleViewChange('bies_events_view', setEventsView)}>
+                    <select className="select-input" value={eventsView} onChange={handleViewChange('nb_events_view', setEventsView)}>
                         <option value="list">List</option>
                         <option value="standard">Grid</option>
                     </select>
@@ -320,7 +320,7 @@ const Settings = () => {
                             <p className="setting-desc">Default layout for the Media page</p>
                         </div>
                     </div>
-                    <select className="select-input" value={mediaView} onChange={handleViewChange('bies_media_view', setMediaView)}>
+                    <select className="select-input" value={mediaView} onChange={handleViewChange('nb_media_view', setMediaView)}>
                         <option value="card">Cards</option>
                         <option value="list">List</option>
                         <option value="icon">Icons</option>

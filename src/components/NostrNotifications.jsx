@@ -18,7 +18,7 @@ const NostrNotifications = ({ mobile = false }) => {
     const [myPostIds, setMyPostIds] = useState(new Set());
     const [readIds, setReadIds] = useState(() => {
         try {
-            return new Set(JSON.parse(localStorage.getItem('bies_notif_read') || '[]'));
+            return new Set(JSON.parse(localStorage.getItem('nb_notif_read') || '[]'));
         } catch { return new Set(); }
     });
     const navigate = useNavigate();
@@ -32,14 +32,14 @@ const NostrNotifications = ({ mobile = false }) => {
     const markAllRead = useCallback(() => {
         const allIds = new Set(notifications.map(n => n.id));
         setReadIds(allIds);
-        localStorage.setItem('bies_notif_read', JSON.stringify([...allIds]));
+        localStorage.setItem('nb_notif_read', JSON.stringify([...allIds]));
     }, [notifications]);
 
     const markRead = useCallback((id) => {
         setReadIds(prev => {
             const next = new Set(prev);
             next.add(id);
-            localStorage.setItem('bies_notif_read', JSON.stringify([...next]));
+            localStorage.setItem('nb_notif_read', JSON.stringify([...next]));
             return next;
         });
     }, []);

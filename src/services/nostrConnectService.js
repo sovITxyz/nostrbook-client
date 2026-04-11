@@ -11,8 +11,8 @@
 import { generateSecretKey } from 'nostr-tools';
 import { parseBunkerInput, BunkerSigner } from 'nostr-tools/nip46';
 
-const CLIENT_SK_KEY = 'bies_nip46_client_sk';
-const BUNKER_POINTER_KEY = 'bies_nip46_bunker';
+const CLIENT_SK_KEY = 'nb_nip46_client_sk';
+const BUNKER_POINTER_KEY = 'nb_nip46_bunker';
 
 const CONNECT_TIMEOUT_MS = 30_000;
 

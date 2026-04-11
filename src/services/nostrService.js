@@ -163,8 +163,11 @@ class NostrService {
      * Batch-fetch profiles for multiple pubkeys.
      * Returns a Map of pubkey → merged profile object.
      *
+     * Defaults to the community private relay. If any pubkeys are still missing
+     * after querying the primary relays, falls back to public relays.
+     *
      * @param {string[]} pubkeys - hex pubkeys
-     * @param {string[]} [relays] - specific relays to query (default: community + public)
+     * @param {string[]} [relays] - specific relays to query (default: community relay only)
      */
     async getProfiles(pubkeys, relays) {
         const unique = [...new Set(pubkeys)].filter(Boolean);
@@ -175,13 +178,27 @@ class NostrService {
         const missing = unique.filter(pk => !cached.has(pk));
         if (missing.length === 0) return cached;
 
-        // Phase 2: fetch missing from relays
+        // Phase 2: fetch missing from relays (community relay by default)
         try {
             const result = new Map(cached);
-            const targetRelays = relays || [this.communityRelay, ...this.publicRelays];
-            const events = await this.pool.querySync(targetRelays, { kinds: [0], authors: missing });
+            const primaryRelays = relays || [this.communityRelay];
+            const events = await this.pool.querySync(primaryRelays, { kinds: [0], authors: missing });
             const fetched = this._mergeProfileEvents(events);
             for (const [pk, p] of fetched) result.set(pk, p);
+
+            // Phase 3: fallback to public relays for any still-missing profiles
+            // (skip if caller explicitly provided relays)
+            if (!relays) {
+                const stillMissing = missing.filter(pk => !fetched.has(pk));
+                if (stillMissing.length > 0) {
+                    const fallbackEvents = await this.pool.querySync(this.publicRelays, { kinds: [0], authors: stillMissing });
+                    const fallbackFetched = this._mergeProfileEvents(fallbackEvents);
+                    for (const [pk, p] of fallbackFetched) {
+                        fetched.set(pk, p);
+                        result.set(pk, p);
+                    }
+                }
+            }
 
             // Persist newly fetched profiles to cache
             if (fetched.size > 0) profileCache.setMany(fetched);
@@ -218,18 +235,23 @@ class NostrService {
     }
 
     // Fetch user profile (Kind 0 — NIP-01 + NIP-24 extra metadata fields)
-    // Queries community relay + public relays and picks the most recent Kind 0 event,
-    // then merges any missing fields from older events so we get the
-    // most complete profile (banner, picture, etc.).
-    async getProfile(pubkey) {
+    // Queries the community private relay first, then falls back to public relays
+    // if no profile is found. Merges any missing fields from older events.
+    async getProfile(pubkey, relays) {
         // Check cache first
         const cached = profileCache.getMany([pubkey]);
         if (cached.has(pubkey)) return cached.get(pubkey);
 
         try {
             const filter = { kinds: [0], authors: [pubkey] };
-            const allRelays = [this.communityRelay, ...this.publicRelays];
-            const events = await this.pool.querySync(allRelays, filter);
+            const primaryRelays = relays || [this.communityRelay];
+            let events = await this.pool.querySync(primaryRelays, filter);
+
+            // Fallback to public relays if nothing found on primary
+            // (skip if caller explicitly provided relays)
+            if ((!events || events.length === 0) && !relays) {
+                events = await this.pool.querySync(this.publicRelays, filter);
+            }
 
             if (!events || events.length === 0) return null;
 
@@ -302,11 +324,10 @@ class NostrService {
 
         const senderGiftWrap = this._createGiftWrap(sealForSender, senderPubkey, now);
 
-        // Publish gift-wraps to DM relays only (not community relay — throwaway
-        // keys aren't on the whitelist so the private relay would reject them).
+        // Publish gift-wraps to all DM relays (community + public)
         const results = await Promise.allSettled([
-            ...this.pool.publish(this.dmRelays, recipientGiftWrap),
-            ...this.pool.publish(this.dmRelays, senderGiftWrap),
+            ...this.pool.publish(this.dmRelays, recipientGiftWrap, { onauth: handleRelayAuth }),
+            ...this.pool.publish(this.dmRelays, senderGiftWrap, { onauth: handleRelayAuth }),
         ]);
 
         const succeeded = results.filter(r => r.status === 'fulfilled').length;
@@ -349,8 +370,7 @@ class NostrService {
      * Subscribe to NIP-17 DMs (kind:1059 gift-wraps addressed to myPubkey)
      */
     subscribeToNip17DMs(myPubkey, callback) {
-        // Subscribe on DM relays — gift-wraps live on public relays, not the
-        // community relay (throwaway keys aren't whitelisted there).
+        // Subscribe on all DM relays (community + public).
         //
         // Pass a single filter object (not wrapped in an array) — SimplePool
         // in nostr-tools v2 double-nests arrays, producing invalid REQ

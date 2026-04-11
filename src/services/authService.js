@@ -1,8 +1,8 @@
 /**
  * authService — bridges the frontend auth flow with the nostrbook backend.
  *
- * JWT is stored in localStorage under 'bies_token'.
- * User object (without secrets) is cached under 'bies_user'.
+ * JWT is stored in localStorage under 'nb_token'.
+ * User object (without secrets) is cached under 'nb_user'.
  *
  * The service:
  *  - Stores/retrieves JWT
@@ -16,8 +16,8 @@ import { privateKeyFromSeedWords, validateWords } from 'nostr-tools/nip06';
 import { nostrSigner } from './nostrSigner.js';
 import { fingerprintService } from './fingerprintService.js';
 
-const TOKEN_KEY = 'bies_token';
-const USER_KEY = 'bies_user';
+const TOKEN_KEY = 'nb_token';
+const USER_KEY = 'nb_user';
 
 export const authService = {
     // ─── Token management ───────────────────────────────────────────────────

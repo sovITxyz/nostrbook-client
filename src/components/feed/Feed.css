@@ -1,9 +1,9 @@
 /* ==========================================================================
-   BIES Feed — Primal-inspired styles
+   Nostrbook Feed — Primal-inspired styles
    Adapted from Primal Web App (MIT) for React
    ========================================================================== */
 
-/* ---------- CSS custom properties (maps BIES vars → Primal semantics) ---- */
+/* ---------- CSS custom properties (maps app vars → Primal semantics) ----- */
 :root {
   --feed-bg: var(--color-gray-50);
   --feed-card-bg: var(--color-surface, #fff);

@@ -422,7 +422,7 @@ const EditEvent = () => {
                         {nostrStatus === 'failed' && <AlertCircle size={16} />}
                         {nostrStatus === 'publishing' && 'Publishing to Nostr relays...'}
                         {nostrStatus === 'success' && 'Updated on Nostr (NIP-52 calendar event)'}
-                        {nostrStatus === 'failed' && 'Failed to update on Nostr — changes saved locally'}
+                        {nostrStatus === 'failed' && 'Failed to update on Nostr — changes saved to platform only'}
                     </div>
                 )}
 
@@ -687,21 +687,21 @@ const EditEvent = () => {
                                     <h3 className="h3-title section-heading" style={{ fontSize: '1rem' }}>Settings</h3>
 
                                     {(user?.isAdmin || user?.role === 'MOD') && (
-                                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem', background: 'var(--color-orange-tint)', border: '1px solid #fed7aa', borderRadius: '8px', cursor: 'pointer', marginBottom: '0.75rem' }}>
+                                        <label className="settings-option orange">
                                             <input type="checkbox" name="isOfficial" checked={form.isOfficial} onChange={handleChange} style={{ marginTop: '2px', width: 16, height: 16, accentColor: 'var(--color-secondary)' }} />
                                             <div>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><ShieldCheck size={14} /> Official Event</span>
-                                                <p style={{ fontSize: '0.73rem', color: '#b45309', margin: '0.2rem 0 0' }}>Official events appear prominently at the top of the events page.</p>
+                                                <span className="settings-option-title"><ShieldCheck size={14} /> Official Event</span>
+                                                <p className="settings-option-desc">Official events appear prominently at the top of the events page.</p>
                                             </div>
                                         </label>
                                     )}
 
                                     {!form.isOfficial && form.visibility !== 'DRAFT' && form.visibility !== 'PRIVATE' && (
-                                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem', background: 'var(--color-amber-tint)', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer' }}>
+                                        <label className="settings-option amber">
                                             <input type="checkbox" name="endorsementRequested" checked={form.endorsementRequested} onChange={handleChange} style={{ marginTop: '2px', width: 16, height: 16, accentColor: '#d97706' }} />
                                             <div>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}><Award size={14} style={{ color: '#d97706' }} /> Request Endorsement</span>
-                                                <p style={{ fontSize: '0.73rem', color: '#78350f', margin: '0.2rem 0 0' }}>Endorsed events receive a badge and increased visibility.</p>
+                                                <span className="settings-option-title"><Award size={14} /> Request Endorsement</span>
+                                                <p className="settings-option-desc">Endorsed events receive a badge and increased visibility.</p>
                                             </div>
                                         </label>
                                     )}
@@ -775,6 +775,11 @@ const EditEvent = () => {
                     .event-edit-page > .container > div[style] { flex-direction: column !important; }
                     .event-edit-page > .container > div[style] > div:last-child { width: 100% !important; }
                 }
+                .settings-option { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; cursor: pointer; margin-bottom: 0.75rem; }
+                .settings-option.orange { background: var(--color-orange-tint); border: 1px solid var(--badge-warning-bg); }
+                .settings-option.amber { background: var(--color-amber-tint); border: 1px solid var(--badge-warning-bg); margin-bottom: 0; }
+                .settings-option-title { display: flex; align-items: center; gap: 0.35rem; font-weight: 700; font-size: 0.85rem; color: var(--badge-warning-text); }
+                .settings-option-desc { font-size: 0.73rem; color: var(--color-gray-500); margin: 0.2rem 0 0; }
                 @media (max-width: 768px) {
                     .form-row-label { grid-template-columns: 1fr; gap: 0.5rem; }
                     .form-label { text-align: left; padding-top: 0; }

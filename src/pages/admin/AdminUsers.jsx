@@ -4,7 +4,7 @@ import { CheckCircle, Ban, ExternalLink, Loader2, Search, Shield, Trash2, Refres
 import { adminApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const ROLE_OPTIONS = ['', 'BUILDER', 'INVESTOR', 'MOD', 'ADMIN'];
+const ROLE_OPTIONS = ['', 'MEMBER', 'BUILDER', 'INVESTOR', 'EVENT_HOST', 'EDUCATOR', 'MOD', 'ADMIN'];
 
 // ─── Sync Modal ──────────────────────────────────────────────────────────────
 
@@ -427,13 +427,27 @@ const AdminUsers = () => {
     };
 
     const handleRoleChange = async (id, newRole) => {
-        if (!window.confirm(`Change role to ${newRole}?`)) return;
+        const isGrantingAdmin = newRole === 'ADMIN';
+        const confirmMsg = isGrantingAdmin
+            ? 'Grant ADMIN access to this user? They will have full admin panel privileges.'
+            : `Change role to ${newRole}?`;
+        if (!window.confirm(confirmMsg)) return;
         setActionLoading(id);
         try {
-            await adminApi.setRole(id, newRole);
+            if (isGrantingAdmin) {
+                // Grant admin flag (keeps their current role)
+                await adminApi.setAdmin(id, true);
+            } else {
+                // If user was admin and we're changing to a non-admin role, revoke admin
+                const user = users.find(u => u.id === id);
+                if (user?.isAdmin) {
+                    await adminApi.setAdmin(id, false);
+                }
+                await adminApi.setRole(id, newRole);
+            }
             fetchUsers(pagination.page);
         } catch (err) {
-            alert('Failed to change role');
+            alert(err?.message || 'Failed to change role');
         } finally {
             setActionLoading(null);
         }

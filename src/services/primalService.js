@@ -29,7 +29,7 @@ export const EXPLORE_VIEWS = [
 
 let _subCounter = 0;
 function nextSubId() {
-    return `bies_explore_${++_subCounter}_${Date.now()}`;
+    return `nb_explore_${++_subCounter}_${Date.now()}`;
 }
 
 class PrimalService {

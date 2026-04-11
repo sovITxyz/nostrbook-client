@@ -404,8 +404,8 @@ const Discover = () => {
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [minFunding, setMinFunding] = useState('');
   const [maxFunding, setMaxFunding] = useState('');
-  const [memberViewType, setMemberViewType] = useState(() => localStorage.getItem('bies_members_view') || defaultView);
-  const [projectViewType, setProjectViewType] = useState(() => localStorage.getItem('bies_projects_view') || defaultView);
+  const [memberViewType, setMemberViewType] = useState(() => localStorage.getItem('nb_members_view') || defaultView);
+  const [projectViewType, setProjectViewType] = useState(() => localStorage.getItem('nb_projects_view') || defaultView);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [viewMenuOpenProjects, setViewMenuOpenProjects] = useState(false);
   const [projects, setProjects] = useState([]);

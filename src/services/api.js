@@ -15,7 +15,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 // ─── Core fetch wrapper ───────────────────────────────────────────────────────
 
 async function request(method, path, body = null, options = {}) {
-    const token = localStorage.getItem('bies_token');
+    const token = localStorage.getItem('nb_token');
 
     const headers = {
         'Content-Type': 'application/json',
@@ -31,12 +31,13 @@ async function request(method, path, body = null, options = {}) {
 
     const res = await fetch(`${BASE_URL}${path}`, config);
 
-    // If unauthorized, clear session and reload
-    if (res.status === 401) {
-        localStorage.removeItem('bies_token');
-        localStorage.removeItem('bies_user');
-        // Dispatch a custom event so AuthContext can react
-        window.dispatchEvent(new CustomEvent('bies:unauthorized'));
+    // If unauthorized on a non-auth endpoint, clear session.
+    // Auth endpoints (login, register, challenge) return 401 for invalid
+    // credentials — that should NOT nuke an existing session.
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+        localStorage.removeItem('nb_token');
+        localStorage.removeItem('nb_user');
+        window.dispatchEvent(new CustomEvent('nb:unauthorized'));
     }
 
     const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
@@ -65,7 +66,7 @@ const del = (path) => request('DELETE', path);
 // ─── Form-data upload helper (for files) ─────────────────────────────────────
 
 async function uploadFile(path, formData) {
-    const token = localStorage.getItem('bies_token');
+    const token = localStorage.getItem('nb_token');
     const res = await fetch(`${BASE_URL}${path}`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -278,6 +279,10 @@ export const eventsApi = {
     rsvp: (id, status = 'GOING') => post(`/events/${id}/rsvp`, { status }),
 
     cancelRsvp: (id) => del(`/events/${id}/rsvp`),
+
+    invite: (id, userId) => post(`/events/${id}/invite`, { userId }),
+
+    importUrl: (url) => post('/events/import-url', { url }),
 };
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
@@ -315,6 +320,7 @@ export const adminApi = {
     users: (params = {}) => get('/admin/users', params),
     banUser: (id, banned) => put(`/admin/users/${id}/ban`, { banned }),
     setRole: (id, role) => put(`/admin/users/${id}/role`, { role }),
+    setAdmin: (id, isAdmin) => put(`/admin/users/${id}/admin`, { isAdmin }),
     verifyUser: (id) => put(`/admin/users/${id}/verify`, {}),
     featureProject: (id, featured) => put(`/admin/projects/${id}/feature`, { featured }),
     deleteProject: (id) => del(`/admin/projects/${id}`),
@@ -334,6 +340,9 @@ export const adminApi = {
     clearCache: (pattern = '') => post('/admin/cache/clear', { pattern }),
     investorRequests: (params = {}) => get('/admin/investor-requests', params),
     updateInvestorRequest: (id, status) => put(`/admin/investor-requests/${id}`, { status }),
+    feedback: (params = {}) => get('/admin/feedback', params),
+    updateFeedback: (id, data) => put(`/admin/feedback/${id}`, data),
+    deleteFeedback: (id) => del(`/admin/feedback/${id}`),
 };
 
 // ─── Content (Media / Blog / Resources) ──────────────────────────────────────
@@ -356,6 +365,12 @@ export const newsApi = {
     twitterFeed: () => get('/news/twitter-feed'),
     liveFeed: (keyword) => get('/news/live-feed', keyword ? { keyword } : {}),
     updateSettings: (data) => put('/news/settings', data),
+};
+
+// ─── Feedback ───────────────────────────────────────────────────────────────
+
+export const feedbackApi = {
+    submit: (data) => post('/feedback', data),
 };
 
 // ─── Media (Live Feeds) ──────────────────────────────────────────────────────
@@ -392,7 +407,7 @@ export const walletApi = {
 
 // ─── WebSocket client ─────────────────────────────────────────────────────────
 
-export class BiesWebSocket {
+export class NbWebSocket {
     constructor(onMessage, onConnect, onDisconnect) {
         this.onMessage = onMessage;
         this.onConnect = onConnect;
@@ -404,7 +419,7 @@ export class BiesWebSocket {
     }
 
     connect() {
-        const token = localStorage.getItem('bies_token');
+        const token = localStorage.getItem('nb_token');
         if (!token) return;
 
         const wsUrl = BASE_URL.replace(/^http/, 'ws').replace('/api', '') + `/ws?token=${token}`;

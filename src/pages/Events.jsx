@@ -460,7 +460,7 @@ const Events = () => {
     const [showOfficial, setShowOfficial] = useState(true);
     const [showCommunity, setShowCommunity] = useState(true);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-    const [eventViewType, setEventViewType] = useState(() => localStorage.getItem('bies_events_view') || defaultView);
+    const [eventViewType, setEventViewType] = useState(() => localStorage.getItem('nb_events_view') || defaultView);
     const [viewMenuOpen, setViewMenuOpen] = useState(false);
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 

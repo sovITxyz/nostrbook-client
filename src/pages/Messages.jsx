@@ -573,7 +573,7 @@ const sharedStyles = `
     .user-result-name { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-result-nip05 { font-size: 0.7rem; color: var(--color-gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .source-badge { font-size: 0.65rem; padding: 1px 6px; border-radius: 99px; font-weight: 600; flex-shrink: 0; }
-    .source-badge.bies { background: var(--color-blue-tint); color: #1E40AF; }
+    .source-badge.community { background: var(--color-blue-tint); color: #1E40AF; }
     .source-badge.nostr { background: #F3E8FF; color: #7C3AED; }
 
     .conversation-list { flex: 1 1 0%; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }

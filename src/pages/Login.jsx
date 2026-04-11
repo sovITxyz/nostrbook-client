@@ -4,13 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, Loader2, Key, Globe, FileText, Fingerprint, Smartphone } from 'lucide-react';
 import { PASSKEY_ENABLED, NIP46_ENABLED } from '../config/featureFlags';
-import { isLikelyExtensionInterference } from '../services/keytrService';
+import { isLikelyExtensionInterference, keytrService } from '../services/keytrService';
 import logoIcon from '../assets/logo-icon.svg';
 import NostrIcon from '../components/NostrIcon';
 
 const Login = () => {
     const { t } = useTranslation();
-    const { user: authedUser, loading: authLoading, loginWithNostrAndCheckNew, loginWithNsecAndCheckNew, loginWithSeedPhraseAndCheckNew, loginWithBunkerAndCheckNew, loginWithPasskeyAndCheckNew, loginWithDemo } = useAuth();
+    const { user: authedUser, loading: authLoading, loginWithNostrAndCheckNew, loginWithNsecAndCheckNew, loginWithSeedPhraseAndCheckNew, loginWithBunkerAndCheckNew, loginWithPasskeyAndCheckNew } = useAuth();
     const navigate = useNavigate();
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -81,8 +81,13 @@ const Login = () => {
             return 'Cross-origin passkey failed. Try disabling password manager extensions, ' +
                 'or use Chrome, Edge, or Safari.';
         }
-        if (/PRF.*not (available|supported)|not support.*PRF/i.test(msg)) {
-            return 'Could not decrypt your passkey. Try using the same browser and device where you originally saved it.';
+        if (/credential manager/i.test(msg)) {
+            return 'The credential manager encountered an error. ' +
+                'Try restarting your browser or use your nsec key to log in.';
+        }
+        if (/no discoverable passkey found|no event matches credential/i.test(msg)) {
+            return 'No passkey found for this device. ' +
+                'Log in with your nsec key, then set up a new passkey in Settings.';
         }
         return msg || 'Passkey login failed.';
     };
@@ -91,6 +96,29 @@ const Login = () => {
         setError('');
         setLoading(true);
         try {
+            // If the nsec field has a real nsec, login with it and save as passkey
+            const trimmed = nsecInput.trim();
+            if (trimmed.startsWith('nsec1')) {
+                const result = await loginWithNsecAndCheckNew(trimmed);
+                if (!result.success) {
+                    setError(result.error || 'Invalid nsec key.');
+                    return;
+                }
+                // Login succeeded — now register the passkey for future logins
+                try {
+                    const pubkey = result.user?.nostrPubkey;
+                    if (pubkey) {
+                        await keytrService.saveWithPasskey(trimmed, pubkey);
+                    }
+                } catch (saveErr) {
+                    // Passkey save failed but login succeeded — continue anyway
+                    console.warn('[Login] Passkey save failed:', saveErr.message);
+                }
+                handleResult(result);
+                return;
+            }
+
+            // No nsec present — normal passkey login flow
             const result = await loginWithPasskeyAndCheckNew();
             if (result.cancelled) return;
             if (!result.success) {
@@ -151,20 +179,6 @@ const Login = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    // TODO: Remove before production
-    const handleDemoLogin = () => {
-        const demoUser = {
-            id: 'demo-user',
-            email: 'demo@nostrbook.dev',
-            nostrPubkey: '0000000000000000000000000000000000000000000000000000000000000000',
-            role: 'BUILDER',
-            profile: { name: 'Demo User', bio: 'Demo account for mobile testing', avatar: '', banner: '' },
-        };
-        localStorage.setItem('bies_token', 'demo-token');
-        localStorage.setItem('bies_user', JSON.stringify(demoUser));
-        window.location.href = '/feed';
     };
 
     // ─── Main login form ─────────────────────────────────────────────────────
@@ -345,13 +359,6 @@ const Login = () => {
                     </Link>
                 </div>
 
-                {/* Demo login — TODO: Remove before production */}
-                <div className="mt-4 w-full">
-                    <button onClick={handleDemoLogin} disabled={loading} className="btn-demo">
-                        {loading ? 'Logging in...' : 'Demo Login (skip auth)'}
-                    </button>
-                </div>
-
                 {/* Extension hint — shown when no extension detected */}
                 {!hasNostrExtension && (
                     <>
@@ -476,19 +483,6 @@ const Login = () => {
                     transition: opacity 0.2s;
                 }
                 .btn-create-account:hover { opacity: 0.9; }
-                .btn-demo {
-                    display: block;
-                    width: 100%;
-                    padding: 0.75rem 1.5rem;
-                    background: transparent;
-                    color: var(--color-gray-500);
-                    border: 1px dashed var(--color-gray-200);
-                    border-radius: 9999px;
-                    font-size: 0.85rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .btn-demo:hover { background: var(--color-gray-100); }
                 .login-link-btn {
                     background: none;
                     border: none;

@@ -8,11 +8,11 @@ import { preferencesApi } from './services/api';
 import i18n from './i18n';
 import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
+import VersionIndicator from './components/VersionIndicator';
 
 // Pages
 import Feed from './pages/Feed';
 import Discover from './pages/Discover';
-import Members from './pages/Members';
 import Media from './pages/Media';
 import News from './pages/News';
 import Events from './pages/Events';
@@ -20,7 +20,6 @@ import EventDetail from './pages/EventDetail';
 import CreateEvent from './pages/CreateEvent';
 import EditEvent from './pages/EditEvent';
 import MyEvents from './pages/MyEvents';
-import PublicProfile from './pages/PublicProfile';
 import Profile from './pages/Profile';
 import ProfileEdit from './pages/ProfileEdit';
 import Messages from './pages/Messages';
@@ -50,6 +49,8 @@ import AdminEvents from './pages/admin/AdminEvents';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import AdminNewsSettings from './pages/admin/AdminNewsSettings';
+import AdminFeedback from './pages/admin/AdminFeedback';
+import Feedback from './pages/Feedback';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -140,6 +141,7 @@ const AppContent = () => {
                     <Route path="/media" element={<ProtectedRoute><Media /></ProtectedRoute>} />
                     <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
                     <Route path="/news/:slug" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
+                    <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
 
                     {/* Protected Routes */}
                     {/* Specific Dashboard Routes */}
@@ -173,6 +175,7 @@ const AppContent = () => {
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
                         <Route path="news-settings" element={<AdminNewsSettings />} />
+                        <Route path="feedback" element={<AdminFeedback />} />
                     </Route>
 
                     <Route path="/project/:id" element={
@@ -219,6 +222,7 @@ const AppContent = () => {
                 </Routes>
             </div>
             {user && <MobileBottomNav />}
+            <VersionIndicator />
         </>
     );
 };
