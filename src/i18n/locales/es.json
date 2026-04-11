@@ -1329,5 +1329,11 @@
     "showOriginal": "Ver Original",
     "translating": "Traduciendo...",
     "translationFailed": "Error en la traduccion"
+  },
+  "legal": {
+    "privacyPolicy": "Política de Privacidad",
+    "termsOfService": "Términos de Servicio",
+    "agreeNotice": "Al crear una cuenta, aceptas nuestros Términos de Servicio y Política de Privacidad.",
+    "ageConfirmation": "Confirmo que tengo 18 años o más"
   }
 }

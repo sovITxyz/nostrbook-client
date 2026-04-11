@@ -387,6 +387,8 @@ export async function nostrLogin(req: Request, res: Response): Promise<void> {
             // Check for ban evasion before creating the new account
             const bannedUserIds = await checkBanEvasion(fingerprint);
 
+            const { ageConfirmed } = req.body;
+
             // Auto-create user for Nostr login (no custodial key needed — they manage their own)
             user = await prisma.user.create({
                 data: {
@@ -394,6 +396,7 @@ export async function nostrLogin(req: Request, res: Response): Promise<void> {
                     role: 'MEMBER',
                     isAdmin: isEnvAdmin,
                     isBanned: bannedUserIds.length > 0,
+                    ...(ageConfirmed ? { ageConfirmedAt: new Date() } : {}),
                     profile: {
                         create: {
                             name: `nostr:${pubkey.substring(0, 8)}`,

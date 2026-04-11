@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Folder, Calendar, Users, FileText, Newspaper, MessageSquare, ShieldCheck, LogOut } from 'lucide-react';
+import { LayoutDashboard, Folder, Calendar, Users, FileText, Newspaper, MessageSquare, ShieldCheck, Flag, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -27,6 +27,7 @@ const AdminDashboard = () => {
     { to: '/admin/news-settings', label: 'News', icon: Newspaper },
     { to: '/admin/investor-vetting', label: 'Vetting', icon: ShieldCheck },
     { to: '/admin/feedback', label: 'Feedback', icon: MessageSquare },
+    { to: '/admin/reports', label: 'Reports', icon: Flag },
   ];
 
   const isTabActive = (path, end) => end ? location.pathname === path : location.pathname.startsWith(path);

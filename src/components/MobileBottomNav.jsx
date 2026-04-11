@@ -46,7 +46,7 @@ const MobileBottomNav = () => {
 
   return (
     <>
-      <nav style={{
+      <nav role="navigation" aria-label="Bottom navigation" style={{
         display: 'none',
         position: 'fixed',
         bottom: 0,
@@ -61,7 +61,7 @@ const MobileBottomNav = () => {
         {tabs.map((tab) => {
           if (tab.auth && !isAuthenticated) {
             return (
-              <Link key="login" to="/login" style={itemStyle(false)}>
+              <Link key="login" to="/login" style={itemStyle(false)} aria-label={t('common.login')}>
                 <div style={iconWrapStyle(false)}><User size={22} strokeWidth={1.8} /></div>
                 <span>{t('common.login')}</span>
               </Link>
@@ -70,7 +70,7 @@ const MobileBottomNav = () => {
           const Icon = tab.icon;
           const active = isActive(tab.path);
           return (
-            <Link key={tab.path} to={tab.path} style={itemStyle(active)}>
+            <Link key={tab.path} to={tab.path} style={itemStyle(active)} aria-label={tab.label} aria-current={active ? 'page' : undefined}>
               <div style={iconWrapStyle(active)}>
                 <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
               </div>

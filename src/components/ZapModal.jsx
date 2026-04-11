@@ -199,14 +199,14 @@ const ZapModal = ({ recipients = [], eventId, onClose }) => {
 
     return createPortal(
         <div className="zap-overlay" data-testid="zap-modal" onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onClose(); }} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()} onTouchMove={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) e.preventDefault(); }}>
-            <div className="zap-card">
+            <div className="zap-card" role="dialog" aria-modal="true" aria-labelledby="zap-modal-title">
                 {/* Header */}
                 <div className="zap-header">
-                    <h3 className="zap-title">
+                    <h3 id="zap-modal-title" className="zap-title">
                         <Zap size={18} style={{ color: '#f7931a' }} />
                         Send Zap
                     </h3>
-                    <button className="zap-close" onClick={onClose}>
+                    <button className="zap-close" onClick={onClose} aria-label="Close">
                         <X size={20} />
                     </button>
                 </div>

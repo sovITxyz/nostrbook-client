@@ -58,7 +58,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+    <nav className="navbar" role="navigation" aria-label="Main navigation" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
       <div className="container flex items-center justify-between" style={{ minHeight: '70px', position: 'relative' }}>
 
         {/* Logo */}
@@ -134,6 +134,8 @@ const Navbar = () => {
               <button
                 className={`profile-btn flex items-center gap-sm ${isUserMenuOpen ? 'active' : ''}`}
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                aria-label="User menu"
+                aria-expanded={isUserMenuOpen}
               >
                 <div className="avatar">
                   {user?.profile?.avatar ? (
@@ -199,6 +201,8 @@ const Navbar = () => {
             <button
               className="mobile-toggle"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Open menu"
+              aria-expanded={isMenuOpen}
             >
               <div className="avatar" style={{ width: 32, height: 32 }}>
                 {user?.profile?.avatar ? (

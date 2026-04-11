@@ -7,9 +7,10 @@ import { primalService, EXPLORE_VIEWS } from '../services/primalService';
 import { nostrSigner } from '../services/nostrSigner';
 import { blossomService } from '../services/blossomService';
 import { useAuth } from '../context/AuthContext';
-import { notificationsApi } from '../services/api';
+import { notificationsApi, blocksApi } from '../services/api';
 import NostrIcon from '../components/NostrIcon';
 import ZapModal from '../components/ZapModal';
+import ReportModal from '../components/ReportModal';
 import EmojiPicker from '../components/EmojiPicker';
 import NostrGifPicker from '../components/NostrGifPicker';
 import { useLightbox } from '../context/LightboxContext';
@@ -112,6 +113,7 @@ const Feed = () => {
     const [replyText, setReplyText] = useState('');
     const [replyPosting, setReplyPosting] = useState(false);
     const [zapTarget, setZapTarget] = useState(null);
+    const [reportTarget, setReportTarget] = useState(null); // { type, id, label }
     const [myPubkey, setMyPubkey] = useState(null);
     const [repostMenu, setRepostMenu] = useState(null); // post.id or null — shows repost relay choice
     const [postMenu, setPostMenu] = useState(null); // post.id or null — shows "..." menu
@@ -957,6 +959,18 @@ const Feed = () => {
         catch { return new Set(); }
     });
 
+    // Blocked users — fetched from API on mount
+    const [blockedPubkeys, setBlockedPubkeys] = useState(new Set());
+
+    useEffect(() => {
+        blocksApi.list().then(res => {
+            const blocked = res.data || res || [];
+            setBlockedPubkeys(new Set(blocked.map(u => u.nostrPubkey).filter(Boolean)));
+        }).catch(() => {});
+    }, []);
+
+    const isBlockedOrMuted = (pubkey) => mutedUsers.has(pubkey) || blockedPubkeys.has(pubkey);
+
     const handleMuteUser = (pubkey) => {
         setMutedUsers(prev => {
             const next = new Set(prev).add(pubkey);
@@ -965,26 +979,10 @@ const Feed = () => {
         });
     };
 
-    // Report content — NIP-56 kind:1984 report event
-    const handleReport = async (post) => {
-        if (!nostrSigner.hasKey && nostrSigner.mode !== 'extension' && !nostrSigner.storedMethod && !window.nostr) return;
-        setPostMenu(null);
-        try {
-            const event = {
-                kind: 1984,
-                created_at: Math.floor(Date.now() / 1000),
-                tags: [
-                    ['e', post.id, 'spam'],
-                    ['p', post.pubkey],
-                ],
-                content: '',
-            };
-            await nostrService.publishEvent(event);
-            try { await nostrService.publishToCommunityRelay(event); } catch { /* best-effort */ }
-        } catch (err) {
-            console.error('[Feed] Report failed:', err);
-        }
-    };
+    // Report content — open ReportModal
+    const handleReport = useCallback((postId, pubkey) => {
+        setReportTarget({ type: 'POST', id: postId, label: 'Post' });
+    }, []);
 
     const formatTime = formatTimeUtil;
 
@@ -1069,13 +1067,13 @@ const Feed = () => {
     };
 
     // Only show root posts — filter out replies (events with 'e' tags referencing other events)
-    // Show root posts + reposts, filter out muted users
+    // Show root posts + reposts, filter out muted/blocked users
     const rootPosts = useMemo(() => posts.filter(p => {
-        if (mutedUsers.has(p.pubkey)) return false;
-        // If note was surfaced only via repost and all reposters are muted, hide it
-        if (p._reposters?.length > 0 && p._reposters.every(r => mutedUsers.has(r.pubkey))) return false;
+        if (isBlockedOrMuted(p.pubkey)) return false;
+        // If note was surfaced only via repost and all reposters are muted/blocked, hide it
+        if (p._reposters?.length > 0 && p._reposters.every(r => isBlockedOrMuted(r.pubkey))) return false;
         return p._reposters?.length > 0 || !p.tags?.some(t => t[0] === 'e');
-    }), [posts, mutedUsers]);
+    }), [posts, mutedUsers, blockedPubkeys]);
 
     const getStats = (noteId) => noteStats[noteId] || {};
 
@@ -1722,6 +1720,17 @@ const Feed = () => {
                         recipients={[{ pubkey: zapTarget.pubkey, name: zapTarget.name, avatar: zapTarget.avatar, lud16: zapTarget.lud16 }]}
                         eventId={zapTarget.eventId}
                         onClose={() => setZapTarget(null)}
+                    />
+                )}
+
+                {/* Report Modal */}
+                {reportTarget && (
+                    <ReportModal
+                        isOpen={!!reportTarget}
+                        onClose={() => setReportTarget(null)}
+                        targetType={reportTarget.type}
+                        targetId={reportTarget.id}
+                        targetLabel={reportTarget.label}
                     />
                 )}
             </div>

@@ -12,6 +12,7 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { useLightbox } from '../context/LightboxContext';
 import { nostrService } from '../services/nostrService';
 import { nostrSigner } from '../services/nostrSigner';
+import ReportModal from '../components/ReportModal';
 
 const EventDetail = () => {
     const { id } = useParams();
@@ -36,6 +37,7 @@ const EventDetail = () => {
     const [showCoverRsvp, setShowCoverRsvp] = useState(false);
     const [relayPosting, setRelayPosting] = useState(false);
     const [relayPostStatus, setRelayPostStatus] = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     const parseEvent = (data) => {
         if (!data) return data;
@@ -198,8 +200,7 @@ const EventDetail = () => {
 
     // ─── Report event ─────────────────────────────────────────────────────
     const handleReport = () => {
-        const url = `${window.location.origin}/feedback`;
-        window.open(url, '_blank');
+        setShowReportModal(true);
         setShowActionMenu(false);
     };
 
@@ -630,6 +631,17 @@ const EventDetail = () => {
             </div>
 
             {/* Invite Members Modal */}
+            {/* Report Modal */}
+            {showReportModal && (
+                <ReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    targetType="EVENT"
+                    targetId={id}
+                    targetLabel="Event"
+                />
+            )}
+
             {showInviteModal && (
                 <>
                     <div className="modal-overlay" onClick={() => setShowInviteModal(false)} />

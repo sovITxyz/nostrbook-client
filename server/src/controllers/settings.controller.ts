@@ -187,21 +187,88 @@ export async function updatePreferences(req: Request, res: Response): Promise<vo
     }
 }
 
+export const deleteAccountSchema = z.object({
+    confirmation: z.literal('DELETE'),
+});
+
 /**
  * DELETE /settings/account
- * Delete user account. Prisma cascade handles all related records.
+ * Soft-delete: schedules account for permanent deletion after a 30-day grace period.
  */
 export async function deleteAccount(req: Request, res: Response): Promise<void> {
     try {
         const userId = req.user!.id;
-
-        await prisma.user.delete({
+        await prisma.user.update({
             where: { id: userId },
+            data: { deletedAt: new Date() },
         });
-
-        res.json({ message: 'Account deleted successfully' });
+        // Invalidate all sessions
+        await prisma.session.deleteMany({ where: { userId } });
+        // Log the action
+        await prisma.auditLog.create({
+            data: { userId, action: 'ACCOUNT_DELETION_REQUESTED', resource: `user:${userId}` },
+        });
+        res.json({ message: 'Account scheduled for deletion. You have 30 days to cancel.' });
     } catch (error) {
         console.error('Delete account error:', error);
-        res.status(500).json({ error: 'Failed to delete account' });
+        res.status(500).json({ error: 'Failed to schedule account deletion' });
+    }
+}
+
+/**
+ * PUT /settings/account/restore
+ * Cancel a pending account deletion within the 30-day grace period.
+ */
+export async function cancelDeletion(req: Request, res: Response): Promise<void> {
+    try {
+        const userId = req.user!.id;
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user?.deletedAt) {
+            res.status(400).json({ error: 'Account is not scheduled for deletion' }); return;
+        }
+        const daysSinceDeletion = (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceDeletion > 30) {
+            res.status(410).json({ error: 'Deletion grace period has expired' }); return;
+        }
+        await prisma.user.update({ where: { id: userId }, data: { deletedAt: null } });
+        await prisma.auditLog.create({
+            data: { userId, action: 'ACCOUNT_DELETION_CANCELLED', resource: `user:${userId}` },
+        });
+        res.json({ message: 'Account deletion cancelled' });
+    } catch (error) {
+        console.error('Cancel deletion error:', error);
+        res.status(500).json({ error: 'Failed to cancel deletion' });
+    }
+}
+
+/**
+ * GET /settings/account/export
+ * Export all user data as a JSON download (strips sensitive fields).
+ */
+export async function exportData(req: Request, res: Response): Promise<void> {
+    try {
+        const userId = req.user!.id;
+        const data = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                profile: true,
+                settings: true,
+                projects: { select: { id: true, title: true, description: true, createdAt: true } },
+                hostedEvents: { select: { id: true, title: true, startDate: true, createdAt: true } },
+                following: { include: { following: { select: { id: true, nostrPubkey: true, profile: { select: { name: true } } } } } },
+                followers: { include: { follower: { select: { id: true, nostrPubkey: true, profile: { select: { name: true } } } } } },
+                notifications: { select: { type: true, title: true, body: true, createdAt: true }, take: 100, orderBy: { createdAt: 'desc' } },
+                feedback: { select: { type: true, message: true, status: true, createdAt: true } },
+            },
+        });
+        if (!data) { res.status(404).json({ error: 'User not found' }); return; }
+        // Strip sensitive fields
+        const { passwordHash, encryptedPrivkey, ...safeData } = data as any;
+        res.setHeader('Content-Disposition', `attachment; filename="nostrbook-data-${Date.now()}.json"`);
+        res.setHeader('Content-Type', 'application/json');
+        res.json({ exportedAt: new Date().toISOString(), data: safeData });
+    } catch (error) {
+        console.error('Export data error:', error);
+        res.status(500).json({ error: 'Failed to export data' });
     }
 }

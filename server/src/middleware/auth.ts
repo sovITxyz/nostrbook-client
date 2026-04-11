@@ -57,12 +57,23 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
                 nostrPubkey: true,
                 role: true,
                 isAdmin: true,
+                deletedAt: true,
             },
         });
 
         if (!user) {
             res.status(401).json({ error: 'User not found' });
             return;
+        }
+
+        if (user.deletedAt) {
+            const daysSince = (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
+            if (daysSince > 30) {
+                res.status(401).json({ error: 'Account has been deleted' }); return;
+            }
+            // Within grace period — allow access but flag it
+            (req as any).pendingDeletion = true;
+            (req as any).deletionDate = user.deletedAt;
         }
 
         req.user = user;

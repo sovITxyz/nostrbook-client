@@ -50,7 +50,10 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import AdminNewsSettings from './pages/admin/AdminNewsSettings';
 import AdminFeedback from './pages/admin/AdminFeedback';
+import AdminReports from './pages/admin/AdminReports';
 import Feedback from './pages/Feedback';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -176,6 +179,7 @@ const AppContent = () => {
                         <Route path="audit-log" element={<AdminAuditLog />} />
                         <Route path="news-settings" element={<AdminNewsSettings />} />
                         <Route path="feedback" element={<AdminFeedback />} />
+                        <Route path="reports" element={<AdminReports />} />
                     </Route>
 
                     <Route path="/project/:id" element={
@@ -214,6 +218,10 @@ const AppContent = () => {
                             <Notifications />
                         </ProtectedRoute>
                     } />
+
+                    {/* Public legal pages */}
+                    <Route path="/terms" element={<TermsOfService />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
 
                     {/* 404 Catch-all */}
                     <Route path="*" element={

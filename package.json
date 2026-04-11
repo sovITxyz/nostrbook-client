@@ -14,6 +14,12 @@
     "version:major": "bash scripts/version.sh major"
   },
   "dependencies": {
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/push-notifications": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@sovit.xyz/keytr": "^0.6.1",
     "buffer": "^6.0.3",
     "dompurify": "^3.3.1",

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Briefcase, Globe, Twitter, Linkedin, MoreHorizontal, Share, Loader2, ArrowLeft, Users, Copy, Check, UserPlus, UserCheck, Zap, MessageSquare } from 'lucide-react';
+import { MapPin, Briefcase, Globe, Twitter, Linkedin, MoreHorizontal, Share, Loader2, ArrowLeft, Users, Copy, Check, UserPlus, UserCheck, Zap, MessageSquare, ShieldOff, Flag } from 'lucide-react';
 import { getAssetUrl } from '../utils/assets';
 import { nip19 } from 'nostr-tools';
-import { profilesApi } from '../services/api';
+import { profilesApi, blocksApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLightbox } from '../context/LightboxContext';
@@ -15,6 +15,7 @@ import ZapButton from '../components/ZapButton';
 import ZappableTag from '../components/ZappableTag';
 import ProfileSection from '../components/ProfileSection';
 import TranslatableText from '../components/TranslatableText';
+import ReportModal from '../components/ReportModal';
 
 function isSafeUrl(url) {
     try {
@@ -45,6 +46,9 @@ const PublicProfile = ({ type }) => {
     const [nostrFollowing, setNostrFollowing] = useState(null);
     const [npubCopied, setNpubCopied] = useState(false);
     const [lnAddrCopied, setLnAddrCopied] = useState(false);
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [blockLoading, setBlockLoading] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
     const lightbox = useLightbox();
 
     useEffect(() => {
@@ -120,6 +124,32 @@ const PublicProfile = ({ type }) => {
             }
         }
     }, [profile]);
+
+    // Check if this user is blocked
+    useEffect(() => {
+        if (!currentUser?.id || !targetUserId || currentUser.id === targetUserId) return;
+        blocksApi.list().then(res => {
+            const list = res?.data || res || [];
+            setIsBlocked(list.some(u => u.id === targetUserId));
+        }).catch(() => {});
+    }, [currentUser?.id, targetUserId]);
+
+    const handleToggleBlock = async () => {
+        setBlockLoading(true);
+        try {
+            if (isBlocked) {
+                await blocksApi.unblock(targetUserId);
+                setIsBlocked(false);
+            } else {
+                await blocksApi.block(targetUserId);
+                setIsBlocked(true);
+            }
+        } catch (err) {
+            console.error('Block/unblock failed:', err);
+        }
+        setBlockLoading(false);
+        setShowMenu(false);
+    };
 
     // Fetch followers/following counts
     useEffect(() => {
@@ -284,6 +314,25 @@ const PublicProfile = ({ type }) => {
                                         }}>
                                             <Share size={16} /> {t('publicProfile.shareProfile', 'Share Profile')}
                                         </button>
+                                        {currentUser && targetUserId && currentUser.id !== targetUserId && (
+                                            <button onClick={() => { setShowReportModal(true); setShowMenu(false); }} style={{
+                                                width: '100%', textAlign: 'left', padding: '0.625rem 1rem',
+                                                display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem',
+                                                fontWeight: 500, color: 'var(--color-gray-700)', background: 'none', border: 'none', cursor: 'pointer',
+                                            }}>
+                                                <Flag size={16} /> Report User
+                                            </button>
+                                        )}
+                                        {currentUser && targetUserId && currentUser.id !== targetUserId && (
+                                            <button onClick={handleToggleBlock} disabled={blockLoading} style={{
+                                                width: '100%', textAlign: 'left', padding: '0.625rem 1rem',
+                                                display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem',
+                                                fontWeight: 500, color: 'var(--color-danger, #dc2626)', background: 'none', border: 'none', cursor: blockLoading ? 'wait' : 'pointer',
+                                                opacity: blockLoading ? 0.6 : 1,
+                                            }}>
+                                                <ShieldOff size={16} /> {isBlocked ? 'Unblock User' : 'Block User'}
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -764,6 +813,17 @@ const PublicProfile = ({ type }) => {
                     .profile-grid { grid-template-columns: 1fr; }
                 }
             `}</style>
+
+            {/* Report Modal */}
+            {showReportModal && (
+                <ReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    targetType="USER"
+                    targetId={targetUserId}
+                    targetLabel="User"
+                />
+            )}
         </div>
     );
 };

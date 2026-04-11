@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { isNative } from './utils/platform'
 
 // Error Boundary for debugging white screen
 class ErrorBoundary extends React.Component {
@@ -41,6 +42,25 @@ window.onerror = function (message, source, lineno, colno, error) {
     console.error('[Global]', message, `${source}:${lineno}:${colno}`, error);
 };
 
+// Initialize Capacitor native plugins when running as a native app
+async function initNative() {
+    if (!isNative()) return;
+    try {
+        const { SplashScreen } = await import('@capacitor/splash-screen');
+        const { StatusBar } = await import('@capacitor/status-bar');
+        // Hide splash screen once React renders
+        await SplashScreen.hide();
+        // Match status bar to app theme
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+            (window.matchMedia?.('(prefers-color-scheme: dark)').matches &&
+             localStorage.getItem('nb_theme') !== 'light');
+        await StatusBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
+    } catch (e) {
+        // Plugins may not be available in all environments
+        console.debug('[Native] Plugin init skipped:', e.message);
+    }
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <ErrorBoundary>
@@ -48,3 +68,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </ErrorBoundary>
     </React.StrictMode>,
 )
+
+// Run native init after render
+initNative();
