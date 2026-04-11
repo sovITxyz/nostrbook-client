@@ -8,6 +8,7 @@ import { nostrSigner } from '../services/nostrSigner';
 import { blossomService } from '../services/blossomService';
 import { useAuth } from '../context/AuthContext';
 import { notificationsApi, blocksApi } from '../services/api';
+import { COMMUNITIES } from '../config/communities';
 import NostrIcon from '../components/NostrIcon';
 import ZapModal from '../components/ZapModal';
 import ReportModal from '../components/ReportModal';
@@ -18,6 +19,15 @@ import { nip19 } from 'nostr-tools';
 import { Note, FeedSkeleton, Paginator } from '../components/feed';
 import { formatTime as formatTimeUtil, parseNoteContent as parseNoteContentUtil, getDisplayName as getDisplayNameUtil } from '../utils/noteUtils';
 import '../components/feed/Feed.css';
+
+/**
+ * Resolve the relay URL for a given community slug.
+ * Returns the community's custom relay if set, otherwise COMMUNITY_RELAY (the platform default).
+ */
+function getRelayForCommunity(slug) {
+    const community = COMMUNITIES.find(c => c.slug === slug);
+    return community?.relay || COMMUNITY_RELAY;
+}
 
 const EXPLORE_ICONS = {
     trending_24h: TrendingUp,
@@ -53,7 +63,12 @@ const Feed = () => {
     const [noteStats, setNoteStats] = useState({});
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [feedMode, setFeedMode] = useState('private'); // 'private' | 'explore'
+    // feedMode: 'public' (explore/primal) or a community slug (e.g. 'bies')
+    const [feedMode, setFeedMode] = useState('public');
+    const isExploreMode = feedMode === 'public';
+    const isPrivateMode = !isExploreMode;
+    const activeRelay = isPrivateMode ? getRelayForCommunity(feedMode) : null;
+
     const [exploreView, setExploreView] = useState('trending_24h');
     const [exploreDropdownOpen, setExploreDropdownOpen] = useState(false);
     const exploreDropdownRef = useRef(null);
@@ -68,14 +83,14 @@ const Feed = () => {
     // next subscribeMany creates a fresh WebSocket and re-authenticates.
     useEffect(() => {
         const onVisible = () => {
-            if (document.visibilityState === 'visible' && feedMode === 'private') {
-                nostrService.pool.close([COMMUNITY_RELAY]);
+            if (document.visibilityState === 'visible' && isPrivateMode) {
+                nostrService.pool.close([activeRelay]);
                 setRefreshKey(k => k + 1);
             }
         };
         document.addEventListener('visibilitychange', onVisible);
         return () => document.removeEventListener('visibilitychange', onVisible);
-    }, [feedMode]);
+    }, [isPrivateMode, activeRelay]);
 
     // Close explore dropdown on click outside
     useEffect(() => {
@@ -96,7 +111,7 @@ const Feed = () => {
     // Sync compose relay default to match feed tab (user can still override)
     useEffect(() => {
         if (!manualRelayToggle.current) {
-            setBroadcastPublic(feedMode === 'explore');
+            setBroadcastPublic(isExploreMode);
         }
         manualRelayToggle.current = false;
     }, [feedMode]);
@@ -160,7 +175,7 @@ const Feed = () => {
     // Scroll to a specific post when navigated from notifications
     useEffect(() => {
         const scrollToPost = location.state?.scrollToPost;
-        if (!scrollToPost || loading || feedMode !== 'private') return;
+        if (!scrollToPost || loading || !isPrivateMode) return;
         // Wait a tick for posts to render
         const timer = setTimeout(() => {
             const el = document.querySelector(`[data-post-id="${CSS.escape(scrollToPost)}"]`);
@@ -198,8 +213,9 @@ const Feed = () => {
     const reconnectAttempts = useRef(0);
 
     useEffect(() => {
-        if (feedMode !== 'private') return;
+        if (!isPrivateMode) return;
 
+        const relay = activeRelay;
         setPosts([]);
         setProfiles({});
         setNoteStats({});
@@ -227,7 +243,7 @@ const Feed = () => {
             toFetch.forEach(pk => fetchedProfiles.current.add(pk));
             liveQueue.clear();
             if (toFetch.length === 0) return;
-            const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
+            const profileMap = await nostrService.getProfiles(toFetch, [relay]);
             if (profileMap.size > 0) {
                 setProfiles(prev => {
                     const next = { ...prev };
@@ -252,7 +268,7 @@ const Feed = () => {
             timeout = setTimeout(() => setLoading(false), 15000);
 
             sub = nostrService.pool.subscribeMany(
-                [COMMUNITY_RELAY],
+                [relay],
                 { kinds: [1, 6], limit: 50 },
                 {
                     onevent: (event) => {
@@ -347,7 +363,7 @@ const Feed = () => {
                         }
 
                         // Fetch from community relay only (local, fast)
-                        const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
+                        const profileMap = await nostrService.getProfiles(toFetch, [relay]);
                         if (profileMap.size > 0) {
                             setProfiles(prev => {
                                 const next = { ...prev };
@@ -390,12 +406,12 @@ const Feed = () => {
             clearTimeout(reconnectTimer);
             if (sub) sub.close();
         };
-    }, [feedMode, refreshKey]);
+    }, [feedMode, activeRelay, refreshKey]);
 
     // Fetch ALL reactions for private relay posts — builds stats counts + marks user's own likes/reposts
     const fetchedReactionIds = useRef(new Set());
     useEffect(() => {
-        if (feedMode !== 'private' || posts.length === 0) return;
+        if (!isPrivateMode || posts.length === 0) return;
 
         const postIds = posts.map(p => p.id).filter(id => !fetchedReactionIds.current.has(id));
         if (postIds.length === 0) return;
@@ -407,7 +423,7 @@ const Feed = () => {
         const userReposted = new Set();
 
         const sub = nostrService.pool.subscribeMany(
-            [COMMUNITY_RELAY, ...nostrService.relays],
+            [activeRelay, ...nostrService.relays],
             { kinds: [7, 6, 1], '#e': postIds, limit: 2000 },
             {
                 onevent: (event) => {
@@ -475,7 +491,7 @@ const Feed = () => {
 
     // Fetch explore feed from Primal
     useEffect(() => {
-        if (feedMode !== 'explore') return;
+        if (!isExploreMode) return;
 
         let cancelled = false;
         setPosts([]);
@@ -520,7 +536,7 @@ const Feed = () => {
 
     // Load more for explore feed
     const handleLoadMore = async () => {
-        if (loadingMore || feedMode !== 'explore' || posts.length === 0) return;
+        if (loadingMore || !isExploreMode || posts.length === 0) return;
         setLoadingMore(true);
         try {
             const opts = { limit: 20 };
@@ -560,12 +576,12 @@ const Feed = () => {
     const handleRefreshFeed = useCallback(() => {
         if (loading || refreshing) return;
         setRefreshing(true);
-        if (feedMode === 'private') {
-            nostrService.pool.close([COMMUNITY_RELAY]);
+        if (isPrivateMode && activeRelay) {
+            nostrService.pool.close([activeRelay]);
         }
         setRefreshKey(k => k + 1);
         setTimeout(() => setRefreshing(false), 1500);
-    }, [loading, refreshing, feedMode]);
+    }, [loading, refreshing, isPrivateMode, activeRelay]);
 
     const handleFileSelect = async (e) => {
         const files = Array.from(e.target.files || []);
@@ -645,7 +661,7 @@ const Feed = () => {
             if (broadcastPublic) {
                 await Promise.any(nostrService.pool.publish(nostrService.relays, signedEvent));
             } else {
-                await Promise.any(nostrService.pool.publish([COMMUNITY_RELAY], signedEvent));
+                await Promise.any(nostrService.pool.publish([activeRelay], signedEvent));
             }
 
             // Optimistically add to feed so the user sees it immediately
@@ -740,7 +756,7 @@ const Feed = () => {
                 ],
                 content: '+',
             };
-            if (feedMode === 'private') {
+            if (isPrivateMode) {
                 await nostrService.publishToCommunityRelay(event);
             } else {
                 await nostrService.publishEvent(event);
@@ -813,7 +829,7 @@ const Feed = () => {
                 content,
             };
             const signed = await nostrSigner.signEvent(unsigned);
-            if (feedMode === 'private') {
+            if (isPrivateMode) {
                 await nostrService.publishToCommunityRelay(signed);
             } else {
                 await Promise.any(nostrService.pool.publish(nostrService.relays, signed));
@@ -1083,10 +1099,10 @@ const Feed = () => {
         setLoadingComments(prev => ({ ...prev, [postId]: true }));
 
         // For private relay feed, subscribe directly to community relay for replies
-        if (feedMode === 'private') {
+        if (isPrivateMode) {
             const commentPubkeys = [];
             const sub = nostrService.pool.subscribeMany(
-                [COMMUNITY_RELAY],
+                [activeRelay],
                 { kinds: [1], '#e': [postId], limit: 100 },
                 {
                     onevent: (event) => {
@@ -1105,7 +1121,7 @@ const Feed = () => {
                         const toFetch = [...new Set(commentPubkeys)].filter(pk => !fetchedProfiles.current.has(pk));
                         toFetch.forEach(pk => fetchedProfiles.current.add(pk));
                         if (toFetch.length === 0) return;
-                        const profileMap = await nostrService.getProfiles(toFetch, [COMMUNITY_RELAY]);
+                        const profileMap = await nostrService.getProfiles(toFetch, [activeRelay]);
                         if (profileMap.size > 0) {
                             setProfiles(prev => {
                                 const next = { ...prev };
@@ -1154,7 +1170,7 @@ const Feed = () => {
         } finally {
             setLoadingComments(prev => ({ ...prev, [postId]: false }));
         }
-    }, [feedMode]);
+    }, [feedMode, activeRelay, isPrivateMode]);
 
     const toggleComments = (postId) => {
         setOpenComments(prev => {
@@ -1231,22 +1247,27 @@ const Feed = () => {
                         <span>{t('feed.biesFeed', 'Community Feed')}</span>
                     </div>
                     <div className="primal-feed-tabs">
+                        {/* Public Nostr (explore) tab — always first */}
                         <button
-                            className={`primal-feed-tab ${feedMode === 'private' ? 'active' : ''}`}
-                            onClick={() => setFeedMode('private')}
-                            data-testid="tab-private"
-                        >
-                            <Lock size={15} className="primal-feed-tab-icon" />
-                            <span>{t('feed.privateRelay', 'Private Relay')}</span>
-                        </button>
-                        <button
-                            className={`primal-feed-tab ${feedMode === 'explore' ? 'active' : ''}`}
-                            onClick={() => setFeedMode('explore')}
+                            className={`primal-feed-tab ${isExploreMode ? 'active' : ''}`}
+                            onClick={() => setFeedMode('public')}
                             data-testid="tab-explore"
                         >
                             <Globe size={15} className="primal-feed-tab-icon" />
-                            <span>{t('feed.explore', 'Explore')}</span>
+                            <span>Public Nostr</span>
                         </button>
+                        {/* Community relay tabs — one per joined community */}
+                        {COMMUNITIES.map(c => (
+                            <button
+                                key={c.slug}
+                                className={`primal-feed-tab ${feedMode === c.slug ? 'active' : ''}`}
+                                onClick={() => setFeedMode(c.slug)}
+                                data-testid={`tab-${c.slug}`}
+                            >
+                                <Lock size={15} className="primal-feed-tab-icon" />
+                                <span>{c.shortName || c.name}</span>
+                            </button>
+                        ))}
                         <button
                             className={`primal-feed-refresh${refreshing ? ' spinning' : ''}`}
                             onClick={handleRefreshFeed}
@@ -1258,7 +1279,7 @@ const Feed = () => {
                     </div>
 
                     {/* Explore dropdown */}
-                    {feedMode === 'explore' && (
+                    {isExploreMode && (
                         <div className="primal-explore-dropdown" ref={exploreDropdownRef} data-testid="explore-tabs">
                             <button
                                 className="primal-explore-dropdown-trigger"
@@ -1449,12 +1470,12 @@ const Feed = () => {
                         <NostrIcon size={40} />
                         <h3>{t('feed.noPostsTitle', 'No posts yet')}</h3>
                         <p>
-                            {feedMode === 'private'
+                            {isPrivateMode
                                 ? t('feed.noPostsPrivate', 'Be the first to post on the private relay!')
                                 : t('feed.noPostsExplore', 'Nothing to show right now.')}
                         </p>
-                        {feedMode === 'private' && (
-                            <button className="primal-try-public-btn" onClick={() => setFeedMode('explore')}>
+                        {isPrivateMode && (
+                            <button className="primal-try-public-btn" onClick={() => setFeedMode('public')}>
                                 <Globe size={14} /> {t('feed.exploreNostr', 'Explore Nostr')}
                             </button>
                         )}
@@ -1701,7 +1722,7 @@ const Feed = () => {
                         })}
 
                         {/* Infinite scroll / load more */}
-                        {feedMode === 'explore' && rootPosts.length >= 10 && (
+                        {isExploreMode && rootPosts.length >= 10 && (
                             <>
                                 <Paginator onIntersect={handleLoadMore} disabled={loadingMore} />
                                 {loadingMore && (

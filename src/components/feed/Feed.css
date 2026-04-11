@@ -88,15 +88,24 @@
   display: flex;
   align-items: stretch;
   height: 50px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;     /* Firefox */
+}
+
+.primal-feed-tabs::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari */
 }
 
 .primal-feed-tab {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--feed-text-tertiary);
   background: none;
@@ -104,7 +113,8 @@
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
-  padding: 0 16px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .primal-feed-tab:hover {

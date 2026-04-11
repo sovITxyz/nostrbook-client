@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { eventsApi, uploadApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useCommunity } from '../context/CommunityContext';
 import { nostrService } from '../services/nostrService';
 import { nostrSigner } from '../services/nostrSigner';
 import MemberSearchSelect from '../components/MemberSearchSelect';
@@ -26,10 +27,11 @@ const VISIBILITY_OPTIONS = [
     { value: 'DRAFT', label: 'Draft', icon: <EyeOff size={15} />, desc: 'Saved as draft — only you can see it' },
 ];
 
-const CATEGORIES = ['NETWORKING', 'CONFERENCE', 'WORKSHOP', 'HACKATHON', 'MEETUP', 'DEMO_DAY', 'OTHER'];
+const CATEGORIES = ['CONFERENCE', 'SUMMIT', 'MEETUP', 'WORKSHOP', 'HACKATHON', 'WEBINAR', 'AMA', 'NETWORKING', 'DEMO_DAY', 'SPRINT', 'COURSE', 'SOCIAL', 'FUNDRAISER', 'OTHER'];
 
 const CreateEvent = () => {
     const { user } = useAuth();
+    const { isInCommunity, activeCommunity } = useCommunity();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -639,10 +641,10 @@ const CreateEvent = () => {
                                     </p>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                         {[
-                                            { value: 'none', label: 'Don\'t Publish', desc: 'Event stays on platform only', color: 'var(--color-gray-500)', bg: 'var(--color-gray-50)', border: 'var(--color-gray-200)' },
-                                            { value: 'community', label: 'Community Relay Only', desc: 'Published to the community relay', color: '#2563eb', bg: 'var(--color-blue-tint)', border: '#bfdbfe' },
-                                            { value: 'public', label: 'Public Relays', desc: 'Published to public Nostr relays (damus, primal, etc.)', color: '#16a34a', bg: 'var(--color-green-tint)', border: '#bbf7d0' },
-                                            { value: 'both', label: 'Both', desc: 'Published to community relay and public relays', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+                                            { value: 'none', label: 'Don\'t Publish to Nostr', desc: 'Event stays on Nostrbook only', color: 'var(--color-gray-500)', bg: 'var(--color-gray-50)', border: 'var(--color-gray-200)' },
+                                            { value: 'community', label: isInCommunity ? `${activeCommunity.shortName || activeCommunity.name} Relay Only` : 'Community Relay Only', desc: isInCommunity ? `Only visible within ${activeCommunity.shortName || activeCommunity.name}` : 'Published to the community relay', color: '#2563eb', bg: 'var(--color-blue-tint)', border: '#bfdbfe' },
+                                            { value: 'public', label: 'Public on Nostrbook', desc: 'Listed on the public Nostrbook events page and public Nostr relays', color: '#16a34a', bg: 'var(--color-green-tint)', border: '#bbf7d0' },
+                                            { value: 'both', label: isInCommunity ? `${activeCommunity.shortName || activeCommunity.name} + Public` : 'Community + Public', desc: isInCommunity ? `Visible in ${activeCommunity.shortName || activeCommunity.name} and on the public Nostrbook events page` : 'Published to community relay and public relays', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                                         ].map(opt => (
                                             <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.75rem', border: `1px solid ${form.nostrPublish === opt.value ? opt.border : 'var(--color-gray-200)'}`, borderRadius: '8px', cursor: 'pointer', background: form.nostrPublish === opt.value ? opt.bg : 'var(--color-gray-50)', transition: 'all 0.15s' }}>
                                                 <input type="radio" name="nostrPublish" value={opt.value} checked={form.nostrPublish === opt.value} onChange={handleChange} style={{ display: 'none' }} />

@@ -47,6 +47,7 @@ export const COMMUNITIES = [
         id: 'bies',
         slug: 'bies',
         name: 'Build in El Salvador',
+        shortName: 'BIES',             // shown in feed tab
         tagline: 'The builder community for El Salvador\'s tech ecosystem',
         description: 'Connect with builders, investors, and educators in El Salvador\'s growing tech and Bitcoin ecosystem. Share projects, attend events, and collaborate with the community.',
         memberCount: null,   // populated at runtime from API
@@ -64,6 +65,7 @@ export const COMMUNITIES = [
             navDarkBg: '#00004E',
         },
         fonts: null,  // same as platform default
+        relay: null,  // null = uses the global COMMUNITY_RELAY (BIES relay is the platform default)
         coverImage: null,    // optional hero image
     },
 ];
