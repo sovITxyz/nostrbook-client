@@ -26,8 +26,6 @@ const Signup = () => {
     const [nip05Name, setNip05Name] = useState('');
     const [nip05Available, setNip05Available] = useState(null);
     const [nip05Checking, setNip05Checking] = useState(false);
-    const [ageConfirmed, setAgeConfirmed] = useState(false);
-
     useEffect(() => {
         if (!PASSKEY_ENABLED) return;
         keytrService.checkSupport().then(setPasskeySupported);
@@ -118,7 +116,7 @@ const Signup = () => {
             if (result.success) {
                 // Update profile name + NIP-05 via API
                 const { authService } = await import('../services/authService.js');
-                const profileData = { name: profile.name, ageConfirmed: true };
+                const profileData = { name: profile.name };
                 if (nip05Name.trim()) profileData.nip05Name = nip05Name.trim().toLowerCase();
                 await authService.completeNostrProfile(profileData);
 
@@ -388,16 +386,6 @@ const Signup = () => {
                             </div>
                         )}
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', marginTop: '1rem' }}>
-                            <input
-                                type="checkbox"
-                                checked={ageConfirmed}
-                                onChange={(e) => setAgeConfirmed(e.target.checked)}
-                                style={{ width: 18, height: 18, accentColor: 'var(--color-primary)' }}
-                            />
-                            I confirm I am 18 years of age or older
-                        </label>
-
                         <p style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)', marginTop: '1rem', textAlign: 'center' }}>
                             By creating an account, you agree to our{' '}
                             <Link to="/terms" style={{ color: 'var(--color-primary)' }}>Terms of Service</Link>
@@ -405,7 +393,7 @@ const Signup = () => {
                             <Link to="/privacy" style={{ color: 'var(--color-primary)' }}>Privacy Policy</Link>.
                         </p>
 
-                        <button type="submit" disabled={!ageConfirmed || submitting} className="btn-primary w-full py-3 rounded-full flex items-center justify-center gap-2">
+                        <button type="submit" disabled={submitting} className="btn-primary w-full py-3 rounded-full flex items-center justify-center gap-2">
                             Enter Dashboard <ArrowRight size={18} />
                         </button>
                     </form>

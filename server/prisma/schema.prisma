@@ -50,7 +50,6 @@ model User {
   reports          Report[]   @relation("ReportsBy")
   blocksCreated    Block[]    @relation("BlocksCreated")
   blocksReceived   Block[]    @relation("BlocksReceived")
-  ageConfirmedAt   DateTime?  @map("age_confirmed_at")
 
   @@map("users")
 }
