@@ -83,7 +83,7 @@ const Feed = () => {
     // next subscribeMany creates a fresh WebSocket and re-authenticates.
     useEffect(() => {
         const onVisible = () => {
-            if (document.visibilityState === 'visible' && isPrivateMode) {
+            if (document.visibilityState === 'visible' && isPrivateMode && activeRelay) {
                 nostrService.pool.close([activeRelay]);
                 setRefreshKey(k => k + 1);
             }
@@ -1099,7 +1099,7 @@ const Feed = () => {
         setLoadingComments(prev => ({ ...prev, [postId]: true }));
 
         // For private relay feed, subscribe directly to community relay for replies
-        if (isPrivateMode) {
+        if (isPrivateMode && activeRelay) {
             const commentPubkeys = [];
             const sub = nostrService.pool.subscribeMany(
                 [activeRelay],

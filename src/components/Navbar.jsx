@@ -67,7 +67,7 @@ const Navbar = () => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Link to={isAuthenticated ? "/feed" : "/"} className="logo">
             <img src={logo.horizontalWhite} alt={communityName} className="logo-desktop" style={{ height: '40px' }} />
-            <img src={logo.icon} alt={communityName} className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
+            <img src={logo.iconDark || logo.icon} alt={communityName} className="logo-mobile-pwa" style={{ height: '36px', display: 'none' }} />
           </Link>
         </div>
 
@@ -236,7 +236,7 @@ const Navbar = () => {
           <div className="mobile-overlay" onClick={() => setIsMenuOpen(false)} />
           <div className="mobile-drawer">
             <div className="mobile-drawer-header">
-              <img src={logo.icon} alt={communityName} style={{ height: '32px' }} />
+              <img src={logo.iconDark || logo.icon} alt={communityName} style={{ height: '32px' }} />
               <button onClick={() => setIsMenuOpen(false)} style={{ color: 'white', background: 'none', border: 'none', fontSize: '1.5rem', padding: '8px', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0', display: 'flex', flexDirection: 'column' }}>

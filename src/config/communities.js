@@ -16,6 +16,7 @@
 import nbHorizWhite from '../assets/nostrbook-horizontal-white.svg';
 import nbHorizDark  from '../assets/nostrbook-horizontal-dark.svg';
 import nbIcon       from '../assets/nostrbook-icon.svg';
+import nbIconDark   from '../assets/nostrbook-icon-dark.svg';
 
 // ── BIES community ──────────────────────────────────────────────────────────
 import biesHorizWhite from '../assets/logo-horizontal-white.svg';
@@ -37,7 +38,8 @@ export const NOSTRBOOK_DEFAULTS = {
     logo: {
         horizontalWhite: nbHorizWhite,
         horizontalDark: nbHorizDark,
-        icon: nbIcon,
+        icon: nbIcon,           // light mode icon (white bg, indigo N)
+        iconDark: nbIconDark,   // dark mode icon (indigo bg, white N)
     },
     fonts: null,  // uses the CSS defaults (Inter + PP Formula Narrow)
 };
@@ -55,6 +57,7 @@ export const COMMUNITIES = [
             horizontalWhite: biesHorizWhite,
             horizontalDark: biesHorizDark,
             icon: biesIcon,
+            iconDark: biesIcon,     // same asset works on dark backgrounds
         },
         colors: {
             primary: '#0047AB',
